@@ -1,0 +1,23 @@
+{
+  "include": [
+    "$(MODDABLE)/examples/manifest_base.json"
+  ],
+  "strip": [],
+  "creation": {
+    "stack": 4096
+  },
+  "preload": [ "preload" ],
+  "modules": {
+    "main": [ "./test-xs-main" ],
+    "preload": [ "./preload" ],
+    "./test/*": [ "./test/*" ],
+    "./src/*": [ "./src/*" ],
+    "./src/kernel/*": [ "./src/kernel/*" ],
+    "tape-promise/tape": [ "./xs-platform/tape" ],
+    "@agoric/harden": [ "./xs-platform/harden-deep-freeze" ],
+    "@agoric/eventual-send": [ "./xs-platform/eventual-send.esm" ],
+    "@agoric/marshal": [ "./node_modules/@agoric/marshal/marshal" ],
+    "@agoric/nat": [ "./node_modules/@agoric/nat/dist/nat.esm" ],
+    "xs-platform/*": [ "./xs-platform/*" ]
+  }
+}
