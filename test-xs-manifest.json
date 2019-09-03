@@ -13,7 +13,7 @@
     "./test/*": [ "./test/*" ],
     "./src/*": [ "./src/*" ],
     "./src/kernel/*": [ "./src/kernel/*" ],
-    "tape-promise/tape": [ "./xs-platform/tape" ],
+    "tape-promise/tape": [ "./node_modules/@agoric/tape-xs/tape" ],
     "@agoric/harden": [ "./node_modules/@agoric/harden/src/deepFreeze" ],
     "@agoric/eventual-send": [ "./node_modules/@agoric/eventual-send/dist/eventual-send.esm" ],
     "@agoric/marshal": [ "./node_modules/@agoric/marshal/marshal" ],
