@@ -4,16 +4,18 @@ import { test } from 'tape-promise/tape';
 import { setTimeout } from 'xs-platform/moddableTimer';
 
 import testMarshal from './test/test-marshal';
+import testKernel from './test/test-kernel';
 
 export default function main() {
   trace('# hi from main\n');
   const htest = test.createHarness();
 
   testMarshal();  // ISSUE: htest is ambient
+  testKernel();
 
   setTimeout(() => {
     report(htest.summary(), (txt) => { trace(txt + '\n'); });
-  }, 1);
+  }, 500);
   trace('# bye from main\n');
 }
 
