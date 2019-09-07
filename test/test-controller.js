@@ -2,6 +2,7 @@ import path from 'path';
 import { test } from 'tape-promise/tape';
 import { buildVatController, loadBasedir } from '../src/index';
 
+export default function runTests() {
 test('load empty', async t => {
   const config = {
     vatSources: new Map(),
@@ -274,3 +275,9 @@ test('bootstrap export with SES', async t => {
 test('bootstrap export without SES', async t => {
   await bootstrapExport(t, false);
 });
+
+}
+
+if (typeof require !== 'undefined' && typeof module !== 'undefined') {
+  runTests();
+}
