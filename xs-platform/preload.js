@@ -1,3 +1,5 @@
+/* global Compartment */
+
 import Nat from '@agoric/nat';
 // Add makeHandeled to Promise; needed in test-marshal
 import maybeExtendPromise from '@agoric/eventual-send';
@@ -13,3 +15,23 @@ Object.freeze(Promise);
 export function usesNat() {
   Nat;
 }
+
+export function require(specifier) {
+  // KLUDGE: Turn paths back into what xs manifest expects.
+  if (specifier.startsWith('./')) {
+    specifier = specifier.slice(2);
+  }
+  if (specifier.endsWith('.js')) {
+    specifier = specifier.slice(0, -3);
+  }
+  const c = new Compartment(specifier, { console });
+  return c.export;
+}
+
+function resolve(path) {
+  return path;
+}
+require.resolve = resolve;
+
+global.require = require;
+
