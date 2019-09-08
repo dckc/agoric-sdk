@@ -9,6 +9,9 @@
   },
   "preload": [ "preload" ],
   "modules": {
+    "vat-controller-1": [ "./test/vat-controller-1" ],
+    "test/basedir-controller-2/*": [ "./test/basedir-controller-2/*" ],
+    "test/basedir-controller-3/*": [ "./test/basedir-controller-3/*" ],
     "fs": [ "./xs-platform/fs"],
     "path": [ "./xs-platform/path"],
     "ses": [ "./xs-platform/ses" ],
