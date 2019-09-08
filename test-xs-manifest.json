@@ -1,6 +1,7 @@
 {
   "include": [
-    "$(MODDABLE)/examples/manifest_base.json"
+    "$(MODDABLE)/examples/manifest_base.json",
+    "$(MODDABLE)/modules/files/file/manifest.json"
   ],
   "strip": [],
   "creation": {
