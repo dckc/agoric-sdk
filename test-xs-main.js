@@ -14,7 +14,9 @@ export default function main() {
   testKernel();
 
   setTimeout(() => {
-    report(htest.summary(), (txt) => { trace(txt + '\n'); });
+    report(htest.summary(), txt => {
+      trace(`${txt}\n`);
+    });
   }, 500);
   trace('# bye from main\n');
 }
