@@ -8,6 +8,9 @@
   },
   "preload": [ "preload" ],
   "modules": {
+    "fs": [ "./xs-platform/fs"],
+    "path": [ "./xs-platform/path"],
+    "ses": [ "./xs-platform/ses" ],
     "main": [ "./test-xs-main" ],
     "preload": [ "./preload" ],
     "./test/*": [ "./test/*" ],
@@ -23,7 +26,10 @@
     "@agoric/eventual-send": [ "./node_modules/@agoric/eventual-send/dist/eventual-send.esm" ],
     "@agoric/marshal": [ "./node_modules/@agoric/marshal/marshal" ],
     "@agoric/nat": [ "./node_modules/@agoric/nat/dist/nat.esm" ],
+    "@agoric/default-evaluate-options": [ "./xs-platform/default-evaluate-options" ],
+    "@agoric/acorn-infix-bang": [ "./xs-platform/acorn-infix-bang"],
     "rollup": [ "./xs-platform/rollup" ],
+    "rollup-plugin-node-resolve": [ "./xs-platform/rollup-plugin-node-resolve" ],
     "xs-platform/*": [ "./xs-platform/*" ]
   }
 }
