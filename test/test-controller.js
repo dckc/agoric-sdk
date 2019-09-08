@@ -2,13 +2,15 @@ import path from 'path';
 import { test } from 'tape-promise/tape';
 import { buildVatController, loadBasedir } from '../src/index';
 
+const xsPlatform = true;
+
 export default function runTests() {
   test('load empty', async t => {
     const config = {
       vatSources: new Map(),
       bootstrapIndexJS: undefined,
     };
-    const controller = await buildVatController(config);
+    const controller = await buildVatController(config, !xsPlatform);
     await controller.run();
     t.ok(true);
     t.end();
