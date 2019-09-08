@@ -5,6 +5,13 @@ import { setTimeout } from 'xs-platform/moddableTimer';
 
 import testMarshal from './test/test-marshal';
 import testKernel from './test/test-kernel';
+// ISSUE: belongs in tape
+function report({ total, pass, fail }, writeln) {
+  writeln(`1..${total}`);
+  writeln(`# tests ${total}`);
+  writeln(`# pass  ${pass}`);
+  writeln(`# fail  ${fail}`);
+}
 
 export default function main() {
   trace('# hi from main\n');
@@ -19,12 +26,4 @@ export default function main() {
     });
   }, 500);
   trace('# bye from main\n');
-}
-
-// ISSUE: belongs in tape
-function report({ total, pass, fail }, writeln) {
-  writeln(`1..${total}`);
-  writeln(`# tests ${total}`);
-  writeln(`# pass  ${pass}`);
-  writeln(`# fail  ${fail}`);
 }
