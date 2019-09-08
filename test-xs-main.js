@@ -5,6 +5,8 @@ import { setTimeout } from './xs-platform/moddableTimer';
 
 import testMarshal from './test/test-marshal';
 import testKernel from './test/test-kernel';
+import testController from './test/test-controller';
+
 // ISSUE: belongs in tape
 function report({ total, pass, fail }, writeln) {
   writeln(`1..${total}`);
@@ -19,6 +21,7 @@ export default function main() {
 
   testMarshal();  // ISSUE: htest is ambient
   testKernel();
+  testController();
 
   setTimeout(() => {
     report(htest.summary(), txt => {
