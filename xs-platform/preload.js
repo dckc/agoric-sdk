@@ -35,3 +35,5 @@ require.resolve = resolve;
 
 global.require = require;
 
+// eslint-disable-next-line no-underscore-dangle
+global.__dirname = './test/'; // KLUDGE
