@@ -19,7 +19,7 @@ export default function main() {
   trace('# hi from main\n');
   const htest = test.createHarness();
 
-  testMarshal();  // ISSUE: htest is ambient
+  testMarshal(); // ISSUE: htest is ambient
   testKernel();
   testController();
 
