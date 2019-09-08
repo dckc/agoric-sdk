@@ -23,6 +23,7 @@
     "@agoric/eventual-send": [ "./node_modules/@agoric/eventual-send/dist/eventual-send.esm" ],
     "@agoric/marshal": [ "./node_modules/@agoric/marshal/marshal" ],
     "@agoric/nat": [ "./node_modules/@agoric/nat/dist/nat.esm" ],
+    "rollup": [ "./xs-platform/rollup" ],
     "xs-platform/*": [ "./xs-platform/*" ]
   }
 }
