@@ -1,7 +1,7 @@
 /* global trace */
 
 import { test } from 'tape-promise/tape';
-import { setTimeout } from 'xs-platform/moddableTimer';
+import { setTimeout } from './xs-platform/moddableTimer';
 
 import testMarshal from './test/test-marshal';
 import testKernel from './test/test-kernel';
