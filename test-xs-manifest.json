@@ -12,7 +12,7 @@
     "path": [ "./xs-platform/path"],
     "ses": [ "./xs-platform/ses" ],
     "main": [ "./test-xs-main" ],
-    "preload": [ "./preload" ],
+    "preload": [ "./xs-platform/preload" ],
     "./test/*": [ "./test/*" ],
     "./src/*": [ "./src/*" ],
     "./src/bundles/*": [ "./src/bundles/*" ],
