@@ -1,5 +1,9 @@
 import harden from '@agoric/harden';
-import Nat from '@agoric/nat';
+import { insist } from '../insist';
+import { insistKernelType } from './parseKernelSlots';
+import { insistVatType, parseVatSlot } from '../parseVatSlots';
+import { insistCapData } from '../capdata';
+import { insistMessage } from '../message';
 
 export default function makeDeviceManager(
   deviceName,
@@ -11,66 +15,40 @@ export default function makeDeviceManager(
 ) {
   const { kdebug, send, log } = syscallManager;
 
-  function mapDeviceSlotToKernelSlot(slot) {
-    // kdebug(`mapOutbound ${JSON.stringify(slot)}`);
-    if (slot.type === 'deviceExport') {
-      // one of our exports, so just make the deviceName explicit
-      Nat(slot.id);
-      return { type: 'device', deviceName, id: slot.id };
-    }
-
-    return deviceKeeper.mapDeviceSlotToKernelSlot(slot);
+  function mapDeviceSlotToKernelSlot(devSlot) {
+    insist(`${devSlot}` === devSlot, 'non-string devSlot');
+    // kdebug(`mapOutbound ${devSlot}`);
+    return deviceKeeper.mapDeviceSlotToKernelSlot(devSlot);
   }
 
   // mapInbound: convert from absolute slot to deviceName-relative slot. This
   // is used when building the arguments for dispatch.invoke.
-  function mapKernelSlotToDeviceSlot(slot) {
-    kdebug(`mapInbound for device-${deviceName} of ${JSON.stringify(slot)}`);
-
-    if (slot.type === 'device') {
-      const { deviceName: fromDeviceName, id } = slot;
-      Nat(id);
-
-      if (deviceName !== fromDeviceName) {
-        throw new Error(
-          `devices cannot accept external device refs: ${JSON.stringify(slot)}`,
-        );
-      }
-      // this is returning home, so it's one of our own exports
-      return { type: 'deviceExport', id };
-    }
-
-    return deviceKeeper.mapKernelSlotToDeviceSlot(slot);
+  function mapKernelSlotToDeviceSlot(kernelSlot) {
+    insist(`${kernelSlot}` === kernelSlot, 'non-string kernelSlot');
+    kdebug(`mapInbound for device-${deviceName} of ${kernelSlot}`);
+    return deviceKeeper.mapKernelSlotToDeviceSlot(kernelSlot);
   }
 
   // syscall handlers: these are wrapped by the 'syscall' object and made
   // available to userspace
 
-  function doSendOnly(targetSlot, method, argsString, vatSlots) {
-    if (targetSlot.type === undefined) {
-      throw new Error(
-        `targetSlot isn't really a slot ${JSON.stringify(targetSlot)}`,
-      );
-    }
+  function doSendOnly(targetSlot, method, args) {
+    insist(`${targetSlot}` === targetSlot, 'non-string targetSlot');
+    insistVatType('object', targetSlot);
+    insistCapData(args);
     const target = mapDeviceSlotToKernelSlot(targetSlot);
-    if (!target) {
-      throw Error(
-        `unable to find target for ${deviceName}/${targetSlot.type}-${targetSlot.id}`,
-      );
-    }
-    kdebug(
-      `syscall[${deviceName}].send(vat:${JSON.stringify(
-        targetSlot,
-      )}=ker:${JSON.stringify(target)}).${method}`,
-    );
-    const slots = vatSlots.map(slot => mapDeviceSlotToKernelSlot(slot));
-    kdebug(`  ^target is ${JSON.stringify(target)}`);
+    insist(target, `unable to find target`);
+    kdebug(`syscall[${deviceName}].send(${targetSlot}/${target}).${method}`);
+    kdebug(`  ^target is ${target}`);
     const msg = {
       method,
-      argsString,
-      slots,
-      kernelResolverID: undefined,
+      args: {
+        ...args,
+        slots: args.slots.map(slot => mapDeviceSlotToKernelSlot(slot)),
+      },
+      result: null,
     };
+    insistMessage(msg);
     send(target, msg);
   }
 
@@ -101,20 +79,24 @@ export default function makeDeviceManager(
 
   // dispatch handlers: these are used by the kernel core
 
-  function invoke(target, method, data, slots) {
-    if (target.type !== 'device' || target.deviceName !== deviceName) {
-      throw new Error(`not for me ${JSON.stringify(target)}`);
-    }
-    const inputSlots = slots.map(slot => mapKernelSlotToDeviceSlot(slot));
+  function invoke(target, method, args) {
+    insistKernelType('device', target);
+    insistCapData(args);
+    const t = mapKernelSlotToDeviceSlot(target);
+    insist(parseVatSlot(t).allocatedByVat, 'not allocated by me');
     try {
-      const results = dispatch.invoke(target.id, method, data, inputSlots);
-      const resultSlots = results.slots.map(slot =>
-        mapDeviceSlotToKernelSlot(slot),
-      );
-      return { data: results.data, slots: resultSlots };
+      const results = dispatch.invoke(t, method, {
+        ...args,
+        slots: args.slots.map(slot => mapKernelSlotToDeviceSlot(slot)),
+      });
+      return harden({
+        ...results,
+        slots: results.slots.map(slot => mapDeviceSlotToKernelSlot(slot)),
+      });
     } catch (e) {
       console.log(
-        `device[${deviceName}][${target.id}].${method} invoke failed: ${e}`,
+        `device[${deviceName}][${t}].${method} invoke failed: ${e}`,
+        e,
       );
       return { data: `ERROR: ${e}`, slots: [] };
     }
@@ -122,6 +104,8 @@ export default function makeDeviceManager(
 
   const manager = {
     invoke,
+    mapDeviceSlotToKernelSlot,
+    mapKernelSlotToDeviceSlot,
   };
   return manager;
 }

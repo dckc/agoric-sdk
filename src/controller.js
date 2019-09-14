@@ -12,12 +12,13 @@ import makeDefaultEvaluateOptions from '@agoric/default-evaluate-options';
 import kernelSourceFunc from './bundles/kernel';
 import buildKernelNonSES from './kernel/index';
 import bundleSource from './build-source-bundle';
+import { insistCapData } from './capdata';
 
 const evaluateOptions = makeDefaultEvaluateOptions();
 
 export function loadBasedir(basedir) {
   console.log(`= loading config from basedir ${basedir}`);
-  const vatSources = new Map();
+  const vats = new Map(); // name -> { sourcepath, options }
   const subs = fs.readdirSync(basedir, { withFileTypes: true });
   subs.forEach(dirent => {
     if (dirent.name.endsWith('~')) {
@@ -30,7 +31,7 @@ export function loadBasedir(basedir) {
     ) {
       const name = dirent.name.slice('vat-'.length, -'.js'.length);
       const indexJS = path.resolve(basedir, dirent.name);
-      vatSources.set(name, indexJS);
+      vats.set(name, { sourcepath: indexJS, options: {} });
     } else {
       console.log('ignoring ', dirent.name);
     }
@@ -41,7 +42,7 @@ export function loadBasedir(basedir) {
   } catch (e) {
     bootstrapIndexJS = undefined;
   }
-  return { vatSources, bootstrapIndexJS };
+  return { vats, bootstrapIndexJS };
 }
 
 function getKernelSource() {
@@ -132,7 +133,7 @@ export async function buildVatController(config, withSES = true, argv = []) {
     : buildNonSESKernel(initialState);
   // console.log('kernel', kernel);
 
-  async function addGenesisVat(vatID, sourceIndex, _options = {}) {
+  async function addGenesisVat(vatID, sourceIndex, options = {}) {
     console.log(`= adding vat '${vatID}' from ${sourceIndex}`);
     if (!(sourceIndex[0] === '.' || path.isAbsolute(sourceIndex))) {
       throw Error(
@@ -162,7 +163,7 @@ export async function buildVatController(config, withSES = true, argv = []) {
       // eslint-disable-next-line global-require,import/no-dynamic-require
       setup = require(`${sourceIndex}`).default;
     }
-    kernel.addGenesisVat(vatID, setup);
+    kernel.addGenesisVat(vatID, setup, options);
   }
 
   async function addGenesisDevice(name, sourceIndex, endowments) {
@@ -211,8 +212,10 @@ export async function buildVatController(config, withSES = true, argv = []) {
       await kernel.step();
     },
 
-    queueToExport(vatID, facetID, method, argsString) {
-      kernel.queueToExport(vatID, facetID, method, argsString, []);
+    queueToExport(vatID, facetID, method, args) {
+      insistCapData(args);
+      kernel.addExport(vatID, facetID);
+      kernel.queueToExport(vatID, facetID, method, args);
     },
 
     callBootstrap(vatID, bootstrapArgv) {
@@ -227,10 +230,11 @@ export async function buildVatController(config, withSES = true, argv = []) {
     }
   }
 
-  if (config.vatSources) {
-    for (const vatID of config.vatSources.keys()) {
+  if (config.vats) {
+    for (const vatID of config.vats.keys()) {
+      const v = config.vats.get(vatID);
       // eslint-disable-next-line no-await-in-loop
-      await addGenesisVat(vatID, config.vatSources.get(vatID));
+      await addGenesisVat(vatID, v.sourcepath, v.options || {});
     }
   }
 

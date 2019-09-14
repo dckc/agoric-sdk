@@ -1,51 +1,53 @@
 import path from 'path';
+import harden from '@agoric/harden';
 import { test } from 'tape-promise/tape';
 import { buildVatController, loadBasedir } from '../src/index';
+import { checkKT } from './util';
 
-const xsPlatform = true;
+function capdata(body, slots = []) {
+  return harden({ body, slots });
+}
 
-export default function runTests() {
-  test('load empty', async t => {
-    const config = {
-      vatSources: new Map(),
-      bootstrapIndexJS: undefined,
-    };
-    const controller = await buildVatController(config, !xsPlatform);
-    await controller.run();
-    t.ok(true);
-    t.end();
-  });
+test('load empty', async t => {
+  const config = {
+    vats: new Map(),
+    bootstrapIndexJS: undefined,
+  };
+  const controller = await buildVatController(config);
+  await controller.run();
+  t.ok(true);
+  t.end();
+});
 
-  async function simpleCall(t, withSES) {
-    const config = {
-      vatSources: new Map([['vat1', require.resolve('./vat-controller-1')]]),
-    };
-    const controller = await buildVatController(config, withSES);
-    const data = controller.dump();
-    t.deepEqual(data.vatTables, [{ vatID: 'vat1', state: { transcript: [] } }]);
-    t.deepEqual(data.kernelTable, []);
+async function simpleCall(t, withSES) {
+  const config = {
+    vats: new Map([
+      ['vat1', { sourcepath: require.resolve('./vat-controller-1') }],
+    ]),
+  };
+  const controller = await buildVatController(config, withSES);
+  const data = controller.dump();
+  t.deepEqual(data.vatTables, [{ vatID: 'vat1', state: { transcript: [] } }]);
+  t.deepEqual(data.kernelTable, []);
 
-    controller.queueToExport('vat1', 1, 'foo', 'args');
-    t.deepEqual(controller.dump().runQueue, [
-      {
-        msg: {
-          argsString: 'args',
-          kernelResolverID: null,
-          method: 'foo',
-          slots: [],
-        },
-        target: { id: 1, type: 'export', vatID: 'vat1' },
-        type: 'deliver',
-        vatID: 'vat1',
+  controller.queueToExport('vat1', 'o+1', 'foo', capdata('args'));
+  t.deepEqual(controller.dump().runQueue, [
+    {
+      msg: {
+        method: 'foo',
+        args: capdata('args'),
+        result: null,
       },
-    ]);
-    await controller.run();
-    t.deepEqual(JSON.parse(controller.dump().log[0]), {
-      facetID: 1,
-      method: 'foo',
-      argsString: 'args',
-      slots: [],
-    });
+      target: 'ko20',
+      type: 'send',
+    },
+  ]);
+  await controller.run();
+  t.deepEqual(JSON.parse(controller.dump().log[0]), {
+    facetID: 'o+1',
+    method: 'foo',
+    args: capdata('args'),
+  });
 
     controller.log('2');
     t.equal(controller.dump().log[1], '2');
@@ -61,21 +63,22 @@ export default function runTests() {
     await simpleCall(t, false);
   });
 
-  test('reject module-like sourceIndex', async t => {
-    const vatSources = new Map();
-    // the keys of vatSources are vat source index strings: something that
-    // require() or rollup can use to import/stringify the source graph that
-    // should be loaded into the vat. We want this to be somewhere on local
-    // disk, so it should start with '/' or '.'. If it doesn't, the name will
-    // be treated as something to load from node_modules/ (i.e. something
-    // installed from npm), so we want to reject that.
-    vatSources.set('vat1', 'vatsource');
-    t.rejects(
-      async () => buildVatController({ vatSources }, false),
-      /sourceIndex must be relative/,
-    );
-    t.end();
-  });
+test('reject module-like sourceIndex', async t => {
+  const vats = new Map();
+  // the keys of 'vats' have a 'sourcepath' property which are vat source
+  // index strings: something that require() or rollup can use to
+  // import/stringify the source graph that should be loaded into the vat. We
+  // want this to be somewhere on local disk, so it should start with '/' or
+  // '.'. If it doesn't, the name will be treated as something to load from
+  // node_modules/ (i.e. something installed from npm), so we want to reject
+  // that.
+  vats.set('vat1', { sourcepath: 'vatsource' });
+  t.rejects(
+    async () => buildVatController({ vats }, false),
+    /sourceIndex must be relative/,
+  );
+  t.end();
+});
 
   async function bootstrap(t, withSES) {
     const config = await loadBasedir(
@@ -97,104 +100,103 @@ export default function runTests() {
     await bootstrap(t, false);
   });
 
-  async function bootstrapExport(t, withSES) {
-    const config = await loadBasedir(
-      path.resolve(__dirname, 'basedir-controller-3'),
-    );
-    const c = await buildVatController(config, withSES);
-    // console.log(c.dump());
-    // console.log('SLOTS: ', c.dump().runQueue[0].slots);
-    t.deepEqual(c.dump().kernelTable, []);
+async function bootstrapExport(t, withSES) {
+  const config = await loadBasedir(
+    path.resolve(__dirname, 'basedir-controller-3'),
+  );
+  const c = await buildVatController(config, withSES);
+  // console.log(c.dump());
+  // console.log('SLOTS: ', c.dump().runQueue[0].slots);
 
-    t.deepEqual(c.dump().runQueue, [
-      {
-        msg: {
-          argsString:
-            '{"args":[[],{"_bootstrap":{"@qclass":"slot","index":0},"left":{"@qclass":"slot","index":1},"right":{"@qclass":"slot","index":2}},{"_dummy":"dummy"}]}',
-          kernelResolverID: null,
-          method: 'bootstrap',
-          slots: [
-            { id: 0, type: 'export', vatID: '_bootstrap' },
-            { id: 0, type: 'export', vatID: 'left' },
-            { id: 0, type: 'export', vatID: 'right' },
-          ],
+  // the expected kernel object indices
+  const boot0 = 'ko20';
+  const left0 = 'ko21';
+  const right0 = 'ko22';
+  const kt = [
+    [boot0, '_bootstrap', 'o+0'],
+    [left0, 'left', 'o+0'],
+    [right0, 'right', 'o+0'],
+  ];
+  checkKT(t, c, kt);
+
+  t.deepEqual(c.dump().runQueue, [
+    {
+      msg: {
+        result: null,
+        method: 'bootstrap',
+        args: {
+          body:
+            '[[],{"_bootstrap":{"@qclass":"slot","index":0},"left":{"@qclass":"slot","index":1},"right":{"@qclass":"slot","index":2}},{"_dummy":"dummy"}]',
+          slots: [boot0, left0, right0],
         },
-        target: { id: 0, type: 'export', vatID: '_bootstrap' },
-        type: 'deliver',
-        vatID: '_bootstrap',
+      },
+      target: boot0,
+      type: 'send',
+    },
+  ]);
+
+  t.deepEqual(c.dump().log, [
+    'left.setup called',
+    'right.setup called',
+    'bootstrap called',
+  ]);
+  // console.log('--- c.step() running bootstrap.obj0.bootstrap');
+  await c.step();
+  // kernel promise for result of the foo() that bootstrap sends to vat-left
+  const fooP = 'kp40';
+  t.deepEqual(c.dump().log, [
+    'left.setup called',
+    'right.setup called',
+    'bootstrap called',
+    'bootstrap.obj0.bootstrap()',
+  ]);
+  kt.push([left0, '_bootstrap', 'o-50']);
+  kt.push([right0, '_bootstrap', 'o-51']);
+  kt.push([fooP, '_bootstrap', 'p+5']);
+  checkKT(t, c, kt);
+  t.deepEqual(c.dump().runQueue, [
+    {
+      type: 'send',
+      target: left0,
+      msg: {
+        method: 'foo',
+        args: {
+          body: '[1,{"@qclass":"slot","index":0}]',
+          slots: [right0],
+        },
+        result: fooP,
       },
     ]);
 
-    t.deepEqual(c.dump().log, [
-      'left.setup called',
-      'right.setup called',
-      'bootstrap called',
-    ]);
-    // console.log('--- c.step() running bootstrap.obj0.bootstrap');
-    await c.step();
-    t.deepEqual(c.dump().log, [
-      'left.setup called',
-      'right.setup called',
-      'bootstrap called',
-      'bootstrap.obj0.bootstrap()',
-    ]);
-    t.deepEqual(c.dump().kernelTable, [
-      ['_bootstrap', 'import', 10, 'export', 'left', 0],
-      ['_bootstrap', 'import', 11, 'export', 'right', 0],
-      ['_bootstrap', 'promise', 20, 40],
-    ]);
-    t.deepEqual(c.dump().runQueue, [
-      {
-        vatID: 'left',
-        type: 'deliver',
-        target: {
-          type: 'export',
-          vatID: 'left',
-          id: 0,
-        },
-        msg: {
-          method: 'foo',
-          argsString: '{"args":[1,{"@qclass":"slot","index":0}]}',
-          slots: [{ type: 'export', vatID: 'right', id: 0 }],
-          kernelResolverID: 40,
-        },
-      },
-    ]);
+  await c.step();
+  const barP = 'kp41';
+  t.deepEqual(c.dump().log, [
+    'left.setup called',
+    'right.setup called',
+    'bootstrap called',
+    'bootstrap.obj0.bootstrap()',
+    'left.foo 1',
+  ]);
+  kt.push([right0, 'left', 'o-50']);
+  kt.push([fooP, 'left', 'p-60']);
+  kt.push([barP, 'left', 'p+5']);
+  checkKT(t, c, kt);
 
-    await c.step();
-    t.deepEqual(c.dump().log, [
-      'left.setup called',
-      'right.setup called',
-      'bootstrap called',
-      'bootstrap.obj0.bootstrap()',
-      'left.foo 1',
-    ]);
-    t.deepEqual(c.dump().kernelTable, [
-      ['_bootstrap', 'import', 10, 'export', 'left', 0],
-      ['_bootstrap', 'import', 11, 'export', 'right', 0],
-      ['_bootstrap', 'promise', 20, 40],
-      ['left', 'import', 10, 'export', 'right', 0],
-      ['left', 'promise', 20, 41],
-      ['left', 'resolver', 30, 40],
-    ]);
-    t.deepEqual(c.dump().runQueue, [
-      {
-        vatID: 'right',
-        type: 'deliver',
-        target: {
-          type: 'export',
-          vatID: 'right',
-          id: 0,
+  t.deepEqual(c.dump().runQueue, [
+    {
+      type: 'send',
+      target: right0,
+      msg: {
+        method: 'bar',
+        args: {
+          body: '[2,{"@qclass":"slot","index":0}]',
+          slots: [right0],
         },
-        msg: {
-          method: 'bar',
-          argsString: '{"args":[2,{"@qclass":"slot","index":0}]}',
-          slots: [{ type: 'export', vatID: 'right', id: 0 }],
-          kernelResolverID: 41,
-        },
+        result: barP,
       },
-      { type: 'notifyFulfillToData', vatID: '_bootstrap', kernelPromiseID: 40 },
-    ]);
+    },
+    { type: 'notify', vatID: '_bootstrap', kpid: fooP },
+  ]);
 
     await c.step();
 
@@ -207,19 +209,29 @@ export default function runTests() {
       'right.obj0.bar 2 true',
     ]);
 
-    t.deepEqual(c.dump().kernelTable, [
-      ['_bootstrap', 'import', 10, 'export', 'left', 0],
-      ['_bootstrap', 'import', 11, 'export', 'right', 0],
-      ['_bootstrap', 'promise', 20, 40],
-      ['left', 'import', 10, 'export', 'right', 0],
-      ['left', 'promise', 20, 41],
-      ['left', 'resolver', 30, 40],
-      ['right', 'resolver', 30, 41],
-    ]);
-    t.deepEqual(c.dump().runQueue, [
-      { type: 'notifyFulfillToData', vatID: '_bootstrap', kernelPromiseID: 40 },
-      { type: 'notifyFulfillToData', vatID: 'left', kernelPromiseID: 41 },
-    ]);
+  kt.push([barP, 'right', 'p-60']);
+  checkKT(t, c, kt);
+
+  t.deepEqual(c.dump().runQueue, [
+    { type: 'notify', vatID: '_bootstrap', kpid: fooP },
+    { type: 'notify', vatID: 'left', kpid: barP },
+  ]);
+
+    await c.step();
+
+  t.deepEqual(c.dump().log, [
+    'left.setup called',
+    'right.setup called',
+    'bootstrap called',
+    'bootstrap.obj0.bootstrap()',
+    'left.foo 1',
+    'right.obj0.bar 2 true',
+  ]);
+  checkKT(t, c, kt);
+
+  t.deepEqual(c.dump().runQueue, [
+    { type: 'notify', vatID: 'left', kpid: barP },
+  ]);
 
     await c.step();
 
@@ -232,40 +244,8 @@ export default function runTests() {
       'right.obj0.bar 2 true',
     ]);
 
-    t.deepEqual(c.dump().kernelTable, [
-      ['_bootstrap', 'import', 10, 'export', 'left', 0],
-      ['_bootstrap', 'import', 11, 'export', 'right', 0],
-      ['_bootstrap', 'promise', 20, 40],
-      ['left', 'import', 10, 'export', 'right', 0],
-      ['left', 'promise', 20, 41],
-      ['left', 'resolver', 30, 40],
-      ['right', 'resolver', 30, 41],
-    ]);
-    t.deepEqual(c.dump().runQueue, [
-      { type: 'notifyFulfillToData', vatID: 'left', kernelPromiseID: 41 },
-    ]);
-
-    await c.step();
-
-    t.deepEqual(c.dump().log, [
-      'left.setup called',
-      'right.setup called',
-      'bootstrap called',
-      'bootstrap.obj0.bootstrap()',
-      'left.foo 1',
-      'right.obj0.bar 2 true',
-    ]);
-
-    t.deepEqual(c.dump().kernelTable, [
-      ['_bootstrap', 'import', 10, 'export', 'left', 0],
-      ['_bootstrap', 'import', 11, 'export', 'right', 0],
-      ['_bootstrap', 'promise', 20, 40],
-      ['left', 'import', 10, 'export', 'right', 0],
-      ['left', 'promise', 20, 41],
-      ['left', 'resolver', 30, 40],
-      ['right', 'resolver', 30, 41],
-    ]);
-    t.deepEqual(c.dump().runQueue, []);
+  checkKT(t, c, kt);
+  t.deepEqual(c.dump().runQueue, []);
 
     t.end();
   }

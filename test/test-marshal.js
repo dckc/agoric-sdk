@@ -6,39 +6,50 @@ import { makeMarshal, mustPassByPresence } from '@agoric/marshal';
 import maybeExtendPromise from '@agoric/eventual-send';
 
 import { makeMarshaller } from '../src/kernel/liveSlots';
-import makePromise from '../src/kernel/makePromise';
+import makePromise from '../src/makePromise';
 
-maybeExtendPromise(Promise);
+import { buildVatController } from '../src/index';
 
 export default function runTests() {
+  async function prep() {
+    const config = {
+      vats: new Map(),
+      bootstrapIndexJS: undefined,
+    };
+    const controller = await buildVatController(config, false);
+    await controller.run();
+  }
+
+  maybeExtendPromise(Promise);
+
   test('serialize static data', t => {
     const m = makeMarshal();
     const ser = val => m.serialize(val);
     t.throws(() => ser([1, 2]), /cannot pass non-frozen objects like .*/);
-    t.deepEqual(ser(harden([1, 2])), { argsString: '[1,2]', slots: [] });
+    t.deepEqual(ser(harden([1, 2])), { body: '[1,2]', slots: [] });
     t.deepEqual(ser(harden({ foo: 1 })), {
-      argsString: '{"foo":1}',
+      body: '{"foo":1}',
       slots: [],
     });
-    t.deepEqual(ser(true), { argsString: 'true', slots: [] });
-    t.deepEqual(ser(1), { argsString: '1', slots: [] });
-    t.deepEqual(ser('abc'), { argsString: '"abc"', slots: [] });
+    t.deepEqual(ser(true), { body: 'true', slots: [] });
+    t.deepEqual(ser(1), { body: '1', slots: [] });
+    t.deepEqual(ser('abc'), { body: '"abc"', slots: [] });
     t.deepEqual(ser(undefined), {
-      argsString: '{"@qclass":"undefined"}',
+      body: '{"@qclass":"undefined"}',
       slots: [],
     });
-    t.deepEqual(ser(-0), { argsString: '{"@qclass":"-0"}', slots: [] });
-    t.deepEqual(ser(NaN), { argsString: '{"@qclass":"NaN"}', slots: [] });
+    t.deepEqual(ser(-0), { body: '{"@qclass":"-0"}', slots: [] });
+    t.deepEqual(ser(NaN), { body: '{"@qclass":"NaN"}', slots: [] });
     t.deepEqual(ser(Infinity), {
-      argsString: '{"@qclass":"Infinity"}',
+      body: '{"@qclass":"Infinity"}',
       slots: [],
     });
     t.deepEqual(ser(-Infinity), {
-      argsString: '{"@qclass":"-Infinity"}',
+      body: '{"@qclass":"-Infinity"}',
       slots: [],
     });
     t.deepEqual(ser(Symbol.for('sym1')), {
-      argsString: '{"@qclass":"symbol","key":"sym1"}',
+      body: '{"@qclass":"symbol","key":"sym1"}',
       slots: [],
     });
     let bn;
@@ -51,7 +62,7 @@ export default function runTests() {
     }
     if (bn) {
       t.deepEqual(ser(bn), {
-        argsString: '{"@qclass":"bigint","digits":"4"}',
+        body: '{"@qclass":"bigint","digits":"4"}',
         slots: [],
       });
     }
@@ -63,7 +74,7 @@ export default function runTests() {
       em = harden(e);
     }
     t.deepEqual(ser(em), {
-      argsString: '{"@qclass":"error","name":"ReferenceError","message":"msg"}',
+      body: '{"@qclass":"error","name":"ReferenceError","message":"msg"}',
       slots: [],
     });
 
@@ -72,7 +83,7 @@ export default function runTests() {
 
   test('unserialize static data', t => {
     const m = makeMarshal();
-    const uns = val => m.unserialize(val, []);
+    const uns = body => m.unserialize({ body, slots: [] });
     t.equal(uns('1'), 1);
     t.equal(uns('"abc"'), 'abc');
     t.equal(uns('false'), false);
@@ -140,7 +151,7 @@ export default function runTests() {
     harden(cycle);
 
     t.deepEqual(ser(cycle), {
-      argsString: '["a",{"@qclass":"ibid","index":0},"c"]',
+      body: '["a",{"@qclass":"ibid","index":0},"c"]',
       slots: [],
     });
     t.end();
@@ -148,7 +159,7 @@ export default function runTests() {
 
   test('forbid ibid cycle', t => {
     const m = makeMarshal();
-    const uns = val => m.unserialize(val, []);
+    const uns = body => m.unserialize({ body, slots: [] });
     t.throws(
       () => uns('["a",{"@qclass":"ibid","index":0},"c"]'),
       /Ibid cycle at 0/,
@@ -158,7 +169,7 @@ export default function runTests() {
 
   test('unserialize ibid cycle', t => {
     const m = makeMarshal();
-    const uns = val => m.unserialize(val, [], 'warnOfCycles');
+    const uns = body => m.unserialize({ body, slots: [] }, 'warnOfCycles');
     const cycle = uns('["a",{"@qclass":"ibid","index":0},"c"]');
     t.ok(Object.is(cycle[1], cycle));
     t.end();
@@ -174,43 +185,45 @@ export default function runTests() {
       },
     });
     t.deepEqual(ser(o1), {
-      argsString: '{"@qclass":"slot","index":0}',
-      slots: [{ type: 'export', id: 1 }],
+      body: '{"@qclass":"slot","index":0}',
+      slots: ['o+1'],
     });
     // m now remembers that o1 is exported as 1
     t.deepEqual(ser(harden([o1, o1])), {
-      argsString: '[{"@qclass":"slot","index":0},{"@qclass":"ibid","index":1}]',
-      slots: [{ type: 'export', id: 1 }],
+      body: '[{"@qclass":"slot","index":0},{"@qclass":"ibid","index":1}]',
+      slots: ['o+1'],
     });
     t.deepEqual(ser(harden([o2, o1])), {
-      argsString: '[{"@qclass":"slot","index":0},{"@qclass":"slot","index":1}]',
-      slots: [{ type: 'export', id: 2 }, { type: 'export', id: 1 }],
+      body: '[{"@qclass":"slot","index":0},{"@qclass":"slot","index":1}]',
+      slots: ['o+2', 'o+1'],
     });
 
     t.end();
   });
 
-  test('deserialize imports', t => {
+  test('deserialize imports', async t => {
+    await prep();
     const { m } = makeMarshaller();
-    const a = m.unserialize('{"@qclass":"slot","index":0}', [
-      { type: 'import', id: 1 },
-    ]);
+    const a = m.unserialize({
+      body: '{"@qclass":"slot","index":0}',
+      slots: ['o-1'],
+    });
     // a should be a proxy/presence. For now these are obvious.
-    t.equal(a.toString(), '[Presence 1]');
+    t.equal(a.toString(), '[Presence o-1]');
     t.ok(Object.isFrozen(a));
 
     // m now remembers the proxy
-    const b = m.unserialize('{"@qclass":"slot","index":0}', [
-      { type: 'import', id: 1 },
-    ]);
+    const b = m.unserialize({
+      body: '{"@qclass":"slot","index":0}',
+      slots: ['o-1'],
+    });
     t.is(a, b);
 
     // the slotid is what matters, not the index
-    const c = m.unserialize('{"@qclass":"slot","index":2}', [
-      'x',
-      'x',
-      { type: 'import', id: 1 },
-    ]);
+    const c = m.unserialize({
+      body: '{"@qclass":"slot","index":2}',
+      slots: ['x', 'x', 'o-1'],
+    });
     t.is(a, c);
 
     t.end();
@@ -220,22 +233,25 @@ export default function runTests() {
     const { m } = makeMarshaller();
     const o1 = harden({});
     m.serialize(o1); // allocates slot=1
-    const a = m.unserialize('{"@qclass":"slot","index":0}', [
-      { type: 'export', id: 1 },
-    ]);
+    const a = m.unserialize({
+      body: '{"@qclass":"slot","index":0}',
+      slots: ['o+1'],
+    });
     t.is(a, o1);
 
     t.end();
   });
 
-  test('serialize imports', t => {
+  test('serialize imports', async t => {
+    await prep();
     const { m } = makeMarshaller();
-    const a = m.unserialize('{"@qclass":"slot","index":0}', [
-      { type: 'import', id: 1 },
-    ]);
+    const a = m.unserialize({
+      body: '{"@qclass":"slot","index":0}',
+      slots: ['o-1'],
+    });
     t.deepEqual(m.serialize(a), {
-      argsString: '{"@qclass":"slot","index":0}',
-      slots: [{ type: 'import', id: 1 }],
+      body: '{"@qclass":"slot","index":0}',
+      slots: ['o-1'],
     });
 
     t.end();
@@ -244,34 +260,26 @@ export default function runTests() {
   test('serialize promise', async t => {
     const log = [];
     const syscall = {
-      createPromise() {
-        return {
-          promiseID: 1,
-          resolverID: 2,
-        };
-      },
-      fulfillToData(resolverID, data, slots) {
-        log.push({ resolverID, data, slots });
+      fulfillToData(result, data) {
+        log.push({ result, data });
       },
     };
 
     const { m } = makeMarshaller(syscall);
     const { p, res } = makePromise();
     t.deepEqual(m.serialize(p), {
-      argsString: '{"@qclass":"slot","index":0}',
-      slots: [{ type: 'promise', id: 1 }],
+      body: '{"@qclass":"slot","index":0}',
+      slots: ['p+5'],
     });
     // serializer should remember the promise
     t.deepEqual(m.serialize(harden(['other stuff', p])), {
-      argsString: '["other stuff",{"@qclass":"slot","index":0}]',
-      slots: [{ type: 'promise', id: 1 }],
+      body: '["other stuff",{"@qclass":"slot","index":0}]',
+      slots: ['p+5'],
     });
 
     // inbound should recognize it and return the promise
     t.deepEqual(
-      m.unserialize('{"@qclass":"slot","index":0}', [
-        { type: 'promise', id: 1 },
-      ]),
+      m.unserialize({ body: '{"@qclass":"slot","index":0}', slots: ['p+5'] }),
       p,
     );
 
@@ -281,12 +289,13 @@ export default function runTests() {
     const { p: pauseP, res: pauseRes } = makePromise();
     setImmediate(() => pauseRes());
     await pauseP;
-    t.deepEqual(log, [{ resolverID: 2, data: '5', slots: [] }]);
+    t.deepEqual(log, [{ result: 'p+5', data: { body: '5', slots: [] } }]);
 
     t.end();
   });
 
-  test('unserialize promise', t => {
+  test('unserialize promise', async t => {
+    await prep();
     const log = [];
     const syscall = {
       subscribe(promiseID) {
@@ -295,10 +304,11 @@ export default function runTests() {
     };
 
     const { m } = makeMarshaller(syscall);
-    const p = m.unserialize('{"@qclass":"slot","index":0}', [
-      { type: 'promise', id: 1 },
-    ]);
-    t.deepEqual(log, ['subscribe-1']);
+    const p = m.unserialize({
+      body: '{"@qclass":"slot","index":0}',
+      slots: ['p-1'],
+    });
+    t.deepEqual(log, ['subscribe-p-1']);
     t.ok(p instanceof Promise);
 
     t.end();
@@ -311,7 +321,7 @@ export default function runTests() {
 
   test('mal-formed @qclass', t => {
     const m = makeMarshal();
-    const uns = val => m.unserialize(val, []);
+    const uns = body => m.unserialize({ body, slots: [] });
     t.throws(() => uns('{"@qclass": 0}'), /invalid qclass/);
     t.end();
   });

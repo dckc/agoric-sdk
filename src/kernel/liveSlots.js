@@ -1,6 +1,9 @@
 import harden from '@agoric/harden';
 import Nat from '@agoric/nat';
 import { QCLASS, mustPassByPresence, makeMarshal } from '@agoric/marshal';
+import { insist } from '../insist';
+import { insistVatType, makeVatSlot, parseVatSlot } from '../parseVatSlots';
+import { insistCapData } from '../capdata';
 
 // 'makeLiveSlots' is a dispatcher which uses javascript Maps to keep track
 // of local objects which have been exported. These cannot be persisted
@@ -56,21 +59,11 @@ function build(syscall, _state, makeRoot, forVatID) {
 
   const outstandingProxies = new WeakSet();
 
-  function slotToKey(slot) {
-    if (
-      slot.type === 'export' ||
-      slot.type === 'import' ||
-      slot.type === 'promise' ||
-      slot.type === 'deviceImport'
-    ) {
-      return `${slot.type}-${Nat(slot.id)}`;
-    }
-    throw new Error(`unknown slot.type '${slot.type}'`);
-  }
   const valToSlot = new WeakMap();
-  const slotKeyToVal = new Map();
+  const slotToVal = new Map();
   const importedPromisesByPromiseID = new Map();
   let nextExportID = 1;
+  let nextPromiseID = 5;
 
   function allocateExportID() {
     const exportID = nextExportID;
@@ -78,23 +71,27 @@ function build(syscall, _state, makeRoot, forVatID) {
     return exportID;
   }
 
+  function allocatePromiseID() {
+    const promiseID = nextPromiseID;
+    nextPromiseID += 1;
+    return makeVatSlot('promise', true, promiseID);
+  }
+
   function exportPromise(p) {
-    const pr = syscall.createPromise();
-    // we ignore the kernel promise, but we use the resolver to notify the
-    // kernel when our local promise changes state
-    lsdebug(`ls exporting promise ${pr.resolverID}`);
+    const pid = allocatePromiseID();
+    lsdebug(`ls exporting promise ${pid}`);
     // eslint-disable-next-line no-use-before-define
-    p.then(thenResolve(pr.resolverID), thenReject(pr.resolverID));
-    return harden({ type: 'promise', id: pr.promiseID });
+    p.then(thenResolve(pid), thenReject(pid));
+    return pid;
   }
 
   function exportPassByPresence() {
     const exportID = allocateExportID();
-    return harden({ type: 'export', id: exportID });
+    return makeVatSlot('object', true, exportID);
   }
 
-  function serializeSlot(val, slots, slotMap) {
-    // lsdebug(`serializeSlot`, val, Object.isFrozen(val));
+  function serializeToSlot(val, slots, slotMap) {
+    // lsdebug(`serializeToSlot`, val, Object.isFrozen(val));
     // This is either a Presence (in presenceToImportID), a
     // previously-serialized local pass-by-presence object or
     // previously-serialized local Promise (in valToSlot), a new local
@@ -117,9 +114,9 @@ function build(syscall, _state, makeRoot, forVatID) {
           mustPassByPresence(val);
           slot = exportPassByPresence();
         }
-        const key = slotToKey(slot);
+        parseVatSlot(slot); // assertion
         valToSlot.set(val, slot);
-        slotKeyToVal.set(key, val);
+        slotToVal.set(slot, val);
       }
       slot = valToSlot.get(val);
 
@@ -132,92 +129,81 @@ function build(syscall, _state, makeRoot, forVatID) {
     return harden({ [QCLASS]: 'slot', index: slotIndex });
   }
 
-  function importedPromiseThen(id) {
-    syscall.subscribe(id);
+  function importedPromiseThen(vpid) {
+    insistVatType('promise', vpid);
+    syscall.subscribe(vpid);
   }
 
-  function importPromise(slot) {
-    const { id } = slot;
-    const pr = makeQueued(slot);
+  function importPromise(vpid) {
+    insistVatType('promise', vpid);
+    const pr = makeQueued(vpid);
 
-    importedPromisesByPromiseID.set(id, pr);
+    importedPromisesByPromiseID.set(vpid, pr);
     const { p } = pr;
     // ideally we'd wait until .then is called on p before subscribing, but
     // the current Promise API doesn't give us a way to discover this, so we
     // must subscribe right away. If we were using Vows or some other
     // then-able, we could just hook then() to notify us.
-    lsdebug(`ls[${forVatID}].importPromise.importedPromiseThen ${id}`);
-    importedPromiseThen(id);
+    lsdebug(`ls[${forVatID}].importPromise.importedPromiseThen ${vpid}`);
+    importedPromiseThen(vpid);
     return p;
   }
 
   function unserializeSlot(data, slots) {
     // lsdebug(`unserializeSlot ${data} ${slots}`);
     const slot = slots[Nat(data.index)];
-    const key = slotToKey(slot);
     let val;
-    if (!slotKeyToVal.has(key)) {
-      if (slot.type === 'import') {
+    if (!slotToVal.has(slot)) {
+      const { type, allocatedByVat } = parseVatSlot(slot);
+      insist(!allocatedByVat, `I don't remember allocating ${slot}`);
+      if (type === 'object') {
         // this is a new import value
-        // lsdebug(`assigning new import ${slot.id}`);
+        // lsdebug(`assigning new import ${slot}`);
         const presence = harden({
           toString() {
-            return `[Presence ${slot.id}]`;
+            return `[Presence ${slot}]`;
           },
         });
+        // prepare a Promise for this Presence, so E(val) can work
         const pr = makeQueued(slot);
         pr.res(presence);
         val = presence;
         // lsdebug(` for presence`, val);
-      } else if (slot.type === 'export') {
-        // huh, the kernel should never reference an export we didn't
-        // previously send
-        throw Error(`unrecognized exportID '${slot.id}'`);
-      } else if (slot.type === 'promise') {
+      } else if (type === 'promise') {
         val = importPromise(slot);
-      } else if (slot.type === 'deviceImport') {
-        val = makeDeviceNode(slot.id);
+      } else if (type === 'device') {
+        val = makeDeviceNode(slot);
       } else {
-        throw Error(`unrecognized slot.type '${slot.type}'`);
+        // todo (temporary): resolver?
+        throw Error(`unrecognized slot type '${type}'`);
       }
-      slotKeyToVal.set(key, val);
+      slotToVal.set(slot, val);
       valToSlot.set(val, slot);
     }
-    return slotKeyToVal.get(key);
+    return slotToVal.get(slot);
   }
 
-  // this handles both exports ("targets" which other vats can call)
-  function getTarget(facetID) {
-    const key = slotToKey({ type: 'export', id: facetID });
-    if (!slotKeyToVal.has(key)) {
-      throw Error(`no target for facetID ${facetID}`);
-    }
-    return slotKeyToVal.get(key);
-  }
-
-  const m = makeMarshal(serializeSlot, unserializeSlot);
+  const m = makeMarshal(serializeToSlot, unserializeSlot);
 
   function queueMessage(targetSlot, prop, args) {
-    const ser = m.serialize(harden({ args }));
-    lsdebug(`ls.qm send(${JSON.stringify(targetSlot)}, ${prop}`);
-    const promiseID = syscall.send(targetSlot, prop, ser.argsString, ser.slots);
-    lsdebug(` ls.qm got promiseID ${promiseID}`);
-    const slot = { type: 'promise', id: promiseID };
-    const done = makeQueued(slot);
+    const serArgs = m.serialize(harden(args));
+    const result = allocatePromiseID();
+    const done = makeQueued(result);
+    lsdebug(`ls.qm send(${JSON.stringify(targetSlot)}, ${prop}) -> ${result}`);
+    syscall.send(targetSlot, prop, serArgs, result);
 
     // prepare for notifyFulfillToData/etc
-    importedPromisesByPromiseID.set(promiseID, done);
+    importedPromisesByPromiseID.set(result, done);
 
     // ideally we'd wait until someone .thens done.p, but with native
     // Promises we have no way of spotting that, so subscribe immediately
-    lsdebug(`ls[${forVatID}].queueMessage.importedPromiseThen ${promiseID}`);
-    importedPromiseThen(promiseID);
+    lsdebug(`ls[${forVatID}].queueMessage.importedPromiseThen ${result}`);
+    importedPromiseThen(result);
 
     // prepare the serializer to recognize it, if it's used as an argument or
     // return value
-    const key = slotToKey(slot);
-    valToSlot.set(done.p, slot);
-    slotKeyToVal.set(key, done.p);
+    valToSlot.set(done.p, result);
+    slotToVal.set(result, done.p);
 
     return done.p;
   }
@@ -277,7 +263,7 @@ function build(syscall, _state, makeRoot, forVatID) {
 
     const slot = valToSlot.get(x);
 
-    if (slot && slot.type === 'deviceImport') {
+    if (slot && parseVatSlot(slot).type === 'device') {
       throw new Error(`E() does not accept device nodes`);
     }
 
@@ -305,9 +291,10 @@ function build(syscall, _state, makeRoot, forVatID) {
           return undefined;
         }
         return (...args) => {
-          const ser = m.serialize(harden({ args }));
-          const ret = syscall.callNow(slot, prop, ser.argsString, ser.slots);
-          const retval = m.unserialize(ret.data, ret.slots);
+          const serArgs = m.serialize(harden(args));
+          const ret = syscall.callNow(slot, prop, serArgs);
+          insistCapData(ret);
+          const retval = m.unserialize(ret);
           return retval;
         };
       },
@@ -320,7 +307,7 @@ function build(syscall, _state, makeRoot, forVatID) {
       throw new Error('D(D(x)) is invalid');
     }
     const slot = valToSlot.get(x);
-    if (!slot || slot.type !== 'deviceImport') {
+    if (!slot || parseVatSlot(slot).type !== 'device') {
       throw new Error('D() must be given a device node');
     }
     const handler = DeviceHandler(slot);
@@ -329,12 +316,16 @@ function build(syscall, _state, makeRoot, forVatID) {
     return pr;
   }
 
-  function deliver(facetid, method, argsbytes, caps, { id: resolverID }) {
+  function deliver(target, method, argsdata, result) {
+    insistCapData(argsdata);
     lsdebug(
-      `ls[${forVatID}].dispatch.deliver ${facetid}.${method} -> ${resolverID}`,
+      `ls[${forVatID}].dispatch.deliver ${target}.${method} -> ${result}`,
     );
-    const t = getTarget(facetid);
-    const args = m.unserialize(argsbytes, caps);
+    const t = slotToVal.get(target);
+    if (!t) {
+      throw Error(`no target ${target}`);
+    }
+    const args = m.unserialize(argsdata);
     const p = Promise.resolve().then(_ => {
       if (!(method in t)) {
         throw new TypeError(
@@ -350,17 +341,19 @@ function build(syscall, _state, makeRoot, forVatID) {
           ]}, has ${Object.getOwnPropertyNames(t)}`,
         );
       }
-      return t[method](...args.args);
+      return t[method](...args);
     });
-    if (resolverID !== undefined && resolverID !== null) {
-      lsdebug(` ls.deliver attaching then ->${resolverID}`);
+    if (result) {
+      lsdebug(` ls.deliver attaching then ->${result}`);
+      insistVatType('promise', result);
       // eslint-disable-next-line no-use-before-define
-      p.then(thenResolve(resolverID), thenReject(resolverID));
+      p.then(thenResolve(result), thenReject(result));
     }
     return p;
   }
 
-  function thenResolve(resolverID) {
+  function thenResolve(promiseID) {
+    insistVatType('promise', promiseID);
     return res => {
       harden(res);
       lsdebug(`ls.thenResolve fired`, res);
@@ -368,55 +361,54 @@ function build(syscall, _state, makeRoot, forVatID) {
       // presence, because then the kernel can deliver queued messages. We
       // could build a simpler way of doing this.
       const ser = m.serialize(res);
-      lsdebug(` ser ${ser.argsString} ${JSON.stringify(ser.slots)}`);
-      const unser = JSON.parse(ser.argsString);
+      lsdebug(` ser ${ser.body} ${JSON.stringify(ser.slots)}`);
+      // find out what resolution category we're using
+      const unser = JSON.parse(ser.body);
       if (
         Object(unser) === unser &&
         QCLASS in unser &&
         unser[QCLASS] === 'slot'
       ) {
         const slot = ser.slots[unser.index];
-        if (slot.type === 'import' || slot.type === 'export') {
-          syscall.fulfillToPresence(resolverID, slot);
+        const { type } = parseVatSlot(slot);
+        if (type === 'object') {
+          syscall.fulfillToPresence(promiseID, slot);
+        } else {
+          throw new Error(`thenResolve to non-object slot ${slot}`);
         }
       } else {
         // if it resolves to data, .thens fire but kernel-queued messages are
         // rejected, because you can't send messages to data
-        syscall.fulfillToData(resolverID, ser.argsString, ser.slots);
+        syscall.fulfillToData(promiseID, ser);
       }
     };
   }
 
-  function thenReject(resolverID) {
+  function thenReject(promiseID) {
     return rej => {
       harden(rej);
       lsdebug(`ls thenReject fired`, rej);
       const ser = m.serialize(rej);
-      syscall.reject(resolverID, ser.argsString, ser.slots);
+      syscall.reject(promiseID, ser);
     };
   }
 
-  /*
-  function subscribe(resolverID) {
-    lsdebug(`ls.dispatch.subscribe(${resolverID})`);
-    if (!exportedPromisesByResolverID.has(resolverID)) {
-      throw new Error(`unknown resolverID '${resolverID}'`);
-    }
-    const p = exportedPromisesByResolverID.get(resolverID);
-    p.then(thenResolve(resolverID), thenReject(resolverID));
-  } */
-
-  function notifyFulfillToData(promiseID, data, slots) {
-    lsdebug(`ls.dispatch.notifyFulfillToData(${promiseID}, ${data}, ${slots})`);
+  function notifyFulfillToData(promiseID, data) {
+    insistCapData(data);
+    lsdebug(
+      `ls.dispatch.notifyFulfillToData(${promiseID}, ${data.body}, ${data.slots})`,
+    );
+    insistVatType('promise', promiseID);
     if (!importedPromisesByPromiseID.has(promiseID)) {
       throw new Error(`unknown promiseID '${promiseID}'`);
     }
-    const val = m.unserialize(data, slots);
+    const val = m.unserialize(data);
     importedPromisesByPromiseID.get(promiseID).res(val);
   }
 
   function notifyFulfillToPresence(promiseID, slot) {
     lsdebug(`ls.dispatch.notifyFulfillToPresence(${promiseID}, ${slot})`);
+    insistVatType('promise', promiseID);
     if (!importedPromisesByPromiseID.has(promiseID)) {
       throw new Error(`unknown promiseID '${promiseID}'`);
     }
@@ -424,20 +416,26 @@ function build(syscall, _state, makeRoot, forVatID) {
     importedPromisesByPromiseID.get(promiseID).res(val);
   }
 
-  function notifyReject(promiseID, data, slots) {
-    lsdebug(`ls.dispatch.notifyReject(${promiseID}, ${data}, ${slots})`);
+  function notifyReject(promiseID, data) {
+    insistCapData(data);
+    lsdebug(
+      `ls.dispatch.notifyReject(${promiseID}, ${data.body}, ${data.slots})`,
+    );
+    insistVatType('promise', promiseID);
     if (!importedPromisesByPromiseID.has(promiseID)) {
       throw new Error(`unknown promiseID '${promiseID}'`);
     }
-    const val = m.unserialize(data, slots);
+    const val = m.unserialize(data);
     importedPromisesByPromiseID.get(promiseID).rej(val);
   }
 
+  // here we finally invoke the vat code, and get back the root object
   const rootObject = makeRoot(E, D);
   mustPassByPresence(rootObject);
-  const rootSlot = { type: 'export', id: 0 };
+
+  const rootSlot = makeVatSlot('object', true, 0);
   valToSlot.set(rootObject, rootSlot);
-  slotKeyToVal.set(slotToKey(rootSlot), rootObject);
+  slotToVal.set(rootSlot, rootObject);
 
   return {
     m,
