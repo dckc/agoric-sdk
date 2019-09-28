@@ -5,6 +5,9 @@
   ],
   "strip": [],
   "creation": {
+    "keys": {
+      "available": 4096
+    },
     "stack": 4096
   },
   "preload": [ "preload" ],
