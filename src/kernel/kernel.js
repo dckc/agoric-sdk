@@ -8,10 +8,11 @@ import makeVatManager from './vatManager';
 import makeDeviceManager from './deviceManager';
 import makeKernelKeeper from './state/kernelKeeper';
 import { insistKernelType, parseKernelSlot } from './parseKernelSlots';
-import { makeVatSlot } from '../parseVatSlots';
+import { makeVatSlot, parseVatSlot } from '../parseVatSlots';
 import { insist } from '../insist';
 import { insistCapData } from '../capdata';
 import { insistMessage } from '../message';
+import { insistDeviceID, insistVatID } from './id';
 
 function abbreviateReviver(_, arg) {
   if (typeof arg === 'string' && arg.length >= 40) {
@@ -29,14 +30,14 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
   let started = false;
   // this holds externally-added vats, which are present at startup, but not
   // vats that are added later from within the kernel
-  const genesisVats = new Map(); // vatID -> { setup, options }
+  const genesisVats = new Map(); // name -> { setup, options }
   // we name this 'genesisDevices' for parallelism, but actually all devices
   // must be present at genesis
-  const genesisDevices = new Map();
+  const genesisDevices = new Map(); // name -> { setup, options }
 
   const ephemeral = {
-    vats: new Map(),
-    devices: new Map(),
+    vats: new Map(), // vatID -> { manager, enablePipelining }
+    devices: new Map(), // deviceID -> { manager }
     log: [],
   };
 
@@ -57,6 +58,18 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
   // in the kernel table, promises and resolvers are both indexed by the same
   // value. kernelPromises[promiseID] = { decider, subscribers }
 
+  function send(target, msg) {
+    parseKernelSlot(target);
+    insistMessage(msg);
+    const m = harden({ type: 'send', target, msg });
+    kernelKeeper.addToRunQueue(m);
+  }
+
+  function notify(vatID, kpid) {
+    const m = harden({ type: 'notify', vatID, kpid });
+    kernelKeeper.addToRunQueue(m);
+  }
+
   function makeError(s) {
     // TODO: create a @qclass=error, once we define those
     // or maybe replicate whatever happens with {}.foo()
@@ -67,31 +80,18 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
   function notifySubscribersAndQueue(kpid, subscribers, queue) {
     insistKernelType('promise', kpid);
     for (const vatID of subscribers) {
-      kernelKeeper.addToRunQueue(
-        harden({
-          type: 'notify',
-          vatID,
-          kpid,
-        }),
-      );
+      notify(vatID, kpid);
     }
     // re-deliver msg to the now-settled promise, which will forward or
     // reject depending on the new state of the promise
     for (const msg of queue) {
-      insistMessage(msg);
       // todo: this is slightly lazy, sending the message back to the same
       // promise that just got resolved. When this message makes it to the
       // front of the run-queue, we'll look up the resolution. Instead, we
       // could maybe look up the resolution *now* and set the correct target
       // early. Doing that might make it easier to remove the Promise Table
       // entry earlier.
-      kernelKeeper.addToRunQueue(
-        harden({
-          type: 'send',
-          target: kpid,
-          msg,
-        }),
-      );
+      send(kpid, msg);
     }
   }
 
@@ -114,18 +114,12 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
     then();
   }
 
-  function send(target, msg) {
-    parseKernelSlot(target);
-    insistMessage(msg);
-    const m = harden({ type: 'send', target, msg });
-    kernelKeeper.addToRunQueue(m);
-  }
-
   function invoke(deviceSlot, method, args) {
     insistKernelType('device', deviceSlot);
     insistCapData(args);
-    const deviceName = kernelKeeper.ownerOfKernelDevice(deviceSlot);
-    const dev = ephemeral.devices.get(deviceName);
+    const deviceID = kernelKeeper.ownerOfKernelDevice(deviceSlot);
+    insistDeviceID(deviceID);
+    const dev = ephemeral.devices.get(deviceID);
     if (!dev) {
       throw new Error(`unknown deviceRef ${deviceSlot}`);
     }
@@ -133,18 +127,19 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
   }
 
   function subscribe(vatID, kpid) {
+    insistVatID(vatID);
     const p = kernelKeeper.getKernelPromise(kpid);
     if (p.state === 'unresolved') {
       kernelKeeper.addSubscriberToPromise(kpid, vatID);
     } else {
       // otherwise it's already resolved, you probably want to know how
-      const m = harden({ type: 'notify', vatID, kpid });
-      kernelKeeper.addToRunQueue(m);
+      notify(vatID, kpid);
     }
   }
 
   function getResolveablePromise(kpid, resolvingVatID) {
     insistKernelType('promise', kpid);
+    insistVatID(resolvingVatID);
     const p = kernelKeeper.getKernelPromise(kpid);
     insist(p.state === 'unresolved', `${kpid} was already resolved`);
     insist(
@@ -155,12 +150,10 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
   }
 
   function fulfillToPresence(vatID, kpid, targetSlot) {
+    insistVatID(vatID);
+    insistKernelType('promise', kpid);
+    insistKernelType('object', targetSlot);
     const p = getResolveablePromise(kpid, vatID);
-    const { type } = parseKernelSlot(targetSlot);
-    insist(
-      type === 'object',
-      `fulfillToPresence() must fulfill to object, not ${type}`,
-    );
     const { subscribers, queue } = p;
     kernelKeeper.fulfillKernelPromiseToPresence(kpid, targetSlot);
     notifySubscribersAndQueue(kpid, subscribers, queue);
@@ -173,6 +166,8 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
   }
 
   function fulfillToData(vatID, kpid, data) {
+    insistVatID(vatID);
+    insistKernelType('promise', kpid);
     insistCapData(data);
     const p = getResolveablePromise(kpid, vatID);
     const { subscribers, queue } = p;
@@ -181,6 +176,8 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
   }
 
   function reject(vatID, kpid, data) {
+    insistVatID(vatID);
+    insistKernelType('promise', kpid);
     insistCapData(data);
     const p = getResolveablePromise(kpid, vatID);
     const { subscribers, queue } = p;
@@ -199,22 +196,38 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
     reject,
   };
 
+  function vatNameToID(name) {
+    const vatID = kernelKeeper.getVatIDForName(name);
+    insistVatID(vatID);
+    return vatID;
+  }
+
+  function deviceNameToID(name) {
+    const deviceID = kernelKeeper.getDeviceIDForName(name);
+    insistDeviceID(deviceID);
+    return deviceID;
+  }
+
   function addImport(forVatID, what) {
-    const kernelSlot = `${what}`;
     if (!started) {
       throw new Error('must do kernel.start() before addImport()');
       // because otherwise we can't get the vatManager
     }
-    const vat = ephemeral.vats.get(`${forVatID}`);
+    insistVatID(forVatID);
+    const kernelSlot = `${what}`;
+    parseKernelSlot(what);
+    const vat = ephemeral.vats.get(forVatID);
     return vat.manager.mapKernelSlotToVatSlot(kernelSlot);
   }
 
   function addExport(fromVatID, what) {
-    const vatSlot = `${what}`;
     if (!started) {
       throw new Error('must do kernel.start() before addExport()');
       // because otherwise we can't get the vatManager
     }
+    insistVatID(fromVatID);
+    const vatSlot = `${what}`;
+    parseVatSlot(vatSlot);
     const vat = ephemeral.vats.get(fromVatID);
     return vat.manager.mapVatSlotToKernelSlot(vatSlot);
   }
@@ -223,7 +236,9 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
     // queue a message on the end of the queue, with 'absolute' kernelSlots.
     // Use 'step' or 'run' to execute it
     vatID = `${vatID}`;
+    insistVatID(vatID);
     vatSlot = `${vatSlot}`;
+    parseVatSlot(vatSlot);
     method = `${method}`;
     // we can't use insistCapData() here: .slots are from the controller's
     // Realm, not the kernel Realm, so it's the wrong kind of Array
@@ -240,15 +255,8 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
     args.slots.forEach(s => parseKernelSlot(s)); // typecheck
     // we use result=null because this will be json stringified
     const msg = harden({ method, args, result: null });
-    insistMessage(msg);
     const kernelSlot = addExport(vatID, vatSlot);
-    kernelKeeper.addToRunQueue(
-      harden({
-        type: 'send',
-        target: kernelSlot,
-        msg,
-      }),
-    );
+    send(kernelSlot, msg);
   }
 
   async function deliverToVat(vatID, target, msg) {
@@ -286,6 +294,7 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
     const { type } = parseKernelSlot(target);
     if (type === 'object') {
       const vatID = kernelKeeper.ownerOfKernelObject(target);
+      insistVatID(vatID);
       await deliverToVat(vatID, target, msg);
     } else if (type === 'promise') {
       const kp = kernelKeeper.getKernelPromise(target);
@@ -309,6 +318,7 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
         if (!kp.decider) {
           kernelKeeper.addMessageToPromiseQueue(target, msg);
         } else {
+          insistVatID(kp.decider);
           const vat = ephemeral.vats.get(kp.decider);
           if (vat.enablePipelining) {
             await deliverToVat(kp.decider, target, msg);
@@ -326,6 +336,8 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
 
   async function processNotify(message) {
     const { vatID, kpid } = message;
+    insistVatID(vatID);
+    insistKernelType('promise', kpid);
     const vat = ephemeral.vats.get(vatID);
     insist(vat, `unknown vatID ${vatID}`);
     const p = kernelKeeper.getKernelPromise(kpid);
@@ -349,16 +361,62 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
     }
   }
 
-  function callBootstrap(vatID, argvString) {
+  function addGenesisVat(name, setup, options = {}) {
+    name = `${name}`;
+    harden(setup);
+    // 'setup' must be an in-realm function. This test guards against
+    // accidents, but not against malice. MarkM thinks there is no reliable
+    // way to test this.
+    if (!(setup instanceof Function)) {
+      throw Error('setup is not an in-realm function');
+    }
+    // for now, we guard against 'options' by treating it as JSON-able data
+    options = JSON.parse(JSON.stringify(options));
+    // todo: consider having vats indicate 'enablePipelining' during setup(),
+    // rather than using options= during kernel.addGenesisVat()
+    const knownOptions = new Set(['enablePipelining']);
+    for (const k of Object.getOwnPropertyNames(options)) {
+      if (!knownOptions.has(k)) {
+        throw new Error(`unknown option ${k}`);
+      }
+    }
+
+    if (started) {
+      throw new Error(`addGenesisVat() cannot be called after kernel.start`);
+    }
+    if (genesisVats.has(name)) {
+      throw new Error(`vatID ${name} already added`);
+    }
+    genesisVats.set(name, { setup, options });
+  }
+
+  function addGenesisDevice(name, setup, endowments) {
+    console.log(`kernel.addDevice(${name})`);
+    name = `${name}`;
+    harden(setup);
+    if (!(setup instanceof Function)) {
+      throw Error('setup is not an in-realm function');
+    }
+    if (started) {
+      throw new Error(`addDevice() cannot be called after kernel.start`);
+    }
+    if (genesisDevices.has(name)) {
+      throw new Error(`deviceName ${name} already added`);
+    }
+    genesisDevices.set(name, { setup, endowments });
+  }
+
+  function callBootstrap(bootstrapVatID, argvString) {
     // we invoke obj[0].bootstrap with an object that contains 'vats' and
     // 'argv'.
+    insistVatID(bootstrapVatID);
     const argv = JSON.parse(`${argvString}`);
     // each key of 'vats' will be serialized as a reference to its obj0
     const vrefs = new Map();
     const vatObj0s = {};
     kernelKeeper.getAllVatNames().forEach(name => {
-      const targetVatID = name;
-      const vatManager = ephemeral.vats.get(targetVatID).manager;
+      const vatID = kernelKeeper.getVatIDForName(name);
+      const { manager } = ephemeral.vats.get(vatID);
       // we happen to give _bootstrap to itself, because unit tests that
       // don't have any other vats (bootstrap-only configs) then get a
       // non-empty object as vatObj0s, since an empty object would be
@@ -366,14 +424,14 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
       // bootstrap object to call itself, though.
       const vref = harden({
         toString() {
-          return targetVatID;
+          return name;
         },
       }); // marker
-      vatObj0s[targetVatID] = vref;
+      vatObj0s[name] = vref;
       const vatSlot = makeVatSlot('object', true, 0);
-      const kernelSlot = vatManager.mapVatSlotToKernelSlot(vatSlot);
+      const kernelSlot = manager.mapVatSlotToKernelSlot(vatSlot);
       vrefs.set(vref, kernelSlot);
-      console.log(`adding vref ${targetVatID}`);
+      console.log(`adding vref ${name} [${vatID}]`);
     });
 
     const drefs = new Map();
@@ -383,14 +441,15 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
     // entry to this object so it will serialize as pass-by-copy. We can
     // remove the dummy entry after we add the 'addVat' device
     const deviceObj0s = { _dummy: 'dummy' };
-    kernelKeeper.getAllDeviceNames().forEach(deviceName => {
-      const deviceManager = ephemeral.devices.get(deviceName).manager;
+    kernelKeeper.getAllDeviceNames().forEach(name => {
+      const deviceID = kernelKeeper.getDeviceIDForName(name);
+      const { manager } = ephemeral.devices.get(deviceID);
       const dref = harden({});
-      deviceObj0s[deviceName] = dref;
+      deviceObj0s[name] = dref;
       const devSlot = makeVatSlot('device', true, 0);
-      const kernelSlot = deviceManager.mapDeviceSlotToKernelSlot(devSlot);
+      const kernelSlot = manager.mapDeviceSlotToKernelSlot(devSlot);
       drefs.set(dref, kernelSlot);
-      console.log(`adding dref ${deviceName}`);
+      console.log(`adding dref ${name} [${deviceID}]`);
     });
     if (Object.getOwnPropertyNames(deviceObj0s) === 0) {
       throw new Error('pass-by-copy rules require at least one device');
@@ -417,10 +476,10 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
     const args = harden([argv, vatObj0s, deviceObj0s]);
     // queueToExport() takes kernel-refs (ko+NN, kd+NN) in s.slots
     const boot0 = makeVatSlot('object', true, 0);
-    queueToExport(vatID, boot0, 'bootstrap', m.serialize(args));
+    queueToExport(bootstrapVatID, boot0, 'bootstrap', m.serialize(args));
   }
 
-  async function start(bootstrapVatID, argvString) {
+  async function start(bootstrapVatName, argvString) {
     if (started) {
       throw new Error('kernel.start already called');
     }
@@ -434,10 +493,13 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
     }
 
     // instantiate all vats and devices
-    for (const vatID of genesisVats.keys()) {
-      const { setup, options } = genesisVats.get(vatID);
+    for (const name of genesisVats.keys()) {
+      const { setup, options } = genesisVats.get(name);
+      const vatID = kernelKeeper.provideVatIDForName(name);
+      const vatKeeper = kernelKeeper.provideVatKeeper(vatID);
+
       const helpers = harden({
-        vatID,
+        vatID: name, // TODO: rename to 'name', update vats to match
         makeLiveSlots,
         log(...args) {
           const rendered = args.map(arg =>
@@ -448,10 +510,6 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
           ephemeral.log.push(rendered.join(''));
         },
       });
-
-      const vatKeeper = wasInitialized
-        ? kernelKeeper.getVat(vatID)
-        : kernelKeeper.createVat(vatID);
 
       // the vatManager invokes setup() to build the userspace image
       const manager = makeVatManager(
@@ -473,6 +531,9 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
 
     for (const name of genesisDevices.keys()) {
       const { setup, endowments } = genesisDevices.get(name);
+      const deviceID = kernelKeeper.provideDeviceIDForName(name);
+      const deviceKeeper = kernelKeeper.provideDeviceKeeper(deviceID);
+
       const helpers = harden({
         name,
         makeDeviceSlots,
@@ -480,10 +541,6 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
           ephemeral.log.push(`${str}`);
         },
       });
-
-      const deviceKeeper = wasInitialized
-        ? kernelKeeper.getDevice(name)
-        : kernelKeeper.createDevice(name);
 
       const manager = makeDeviceManager(
         name,
@@ -494,15 +551,20 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
         deviceKeeper,
       );
       // the vat record is not hardened: it holds mutable next-ID values
-      ephemeral.devices.set(name, {
+      ephemeral.devices.set(deviceID, {
         manager,
       });
     }
 
-    // and enqueue the bootstrap() call
-    if (!wasInitialized && ephemeral.vats.has(bootstrapVatID)) {
-      console.log(`=> queueing bootstrap()`);
-      callBootstrap(bootstrapVatID, argvString);
+    // And enqueue the bootstrap() call. If we're reloading from an
+    // initialized state vector, this call will already be in the bootstrap
+    // vat's transcript, so we don't re-queue it.
+    if (!wasInitialized) {
+      if (bootstrapVatName) {
+        const bootstrapVatID = vatNameToID(bootstrapVatName);
+        console.log(`=> queueing bootstrap()`);
+        callBootstrap(bootstrapVatID, argvString);
+      }
     }
 
     // if it *was* initialized, replay the transcripts
@@ -523,97 +585,61 @@ export default function buildKernel(kernelEndowments, initialState = '{}') {
     kernelKeeper.setInitialized();
   }
 
+  async function step() {
+    if (!started) {
+      throw new Error('must do kernel.start() before step()');
+    }
+    // process a single message
+    if (!kernelKeeper.isRunQueueEmpty()) {
+      await processQueueMessage(kernelKeeper.getNextMsg());
+    }
+  }
+
+  async function run() {
+    if (!started) {
+      throw new Error('must do kernel.start() before run()');
+    }
+    // process all messages, until syscall.pause() is invoked
+    running = true;
+    while (running && !kernelKeeper.isRunQueueEmpty()) {
+      // eslint-disable-next-line no-await-in-loop
+      await processQueueMessage(kernelKeeper.getNextMsg());
+    }
+  }
+
+  function getState() {
+    return kernelKeeper.getState();
+  }
+
   const kernel = harden({
-    addGenesisVat(vatID0, setup, options = {}) {
-      const vatID = `${vatID0}`;
-      harden(setup);
-      // 'setup' must be an in-realm function. This test guards against
-      // accidents, but not against malice. MarkM thinks there is no reliable
-      // way to test this.
-      if (!(setup instanceof Function)) {
-        throw Error('setup is not an in-realm function');
-      }
-      // for now, we guard against 'options' by treating it as JSON-able data
-      options = JSON.parse(JSON.stringify(options));
-      // todo: consider having vats indicate 'enablePipelining' during
-      // setup(), rather than using options= during kernel.addVat()
-      const knownOptions = new Set(['enablePipelining']);
-      for (const k of Object.getOwnPropertyNames(options)) {
-        if (!knownOptions.has(k)) {
-          throw new Error(`unknown option ${k}`);
-        }
-      }
+    // these are meant for the controller
+    addGenesisVat,
+    addGenesisDevice,
+    start,
 
-      if (started) {
-        throw new Error(`addGenesisVat() cannot be called after kernel.start`);
-      }
-      if (genesisVats.has(vatID)) {
-        throw new Error(`vatID ${vatID} already added`);
-      }
-      genesisVats.set(vatID, { setup, options });
-    },
+    step,
+    run,
+    getState,
 
-    addGenesisDevice(deviceName, setup, endowments) {
-      console.log(`kernel.addDevice(${deviceName})`);
-      harden(setup);
-      if (!(setup instanceof Function)) {
-        throw Error('setup is not an in-realm function');
-      }
-      if (started) {
-        throw new Error(`addDevice() cannot be called after kernel.start`);
-      }
-      if (genesisDevices.has(deviceName)) {
-        throw new Error(`deviceName ${deviceName} already added`);
-      }
-      genesisDevices.set(deviceName, { setup, endowments });
-    },
-
-    addImport,
-    addExport,
+    // the rest are for testing and debugging
 
     log(str) {
       ephemeral.log.push(`${str}`);
     },
 
-    getState() {
-      return kernelKeeper.getState();
-    },
-
     dump() {
-      const stateDump = kernelKeeper.dump();
       // note: dump().log is not deterministic, since log() does not go
       // through the syscall interface (and we replay transcripts one vat at
       // a time, so any log() calls that were interleaved during their
       // original execution will be sorted by vat in the replace). Logs are
       // not kept in the persistent state, only in ephemeral state.
-      stateDump.log = ephemeral.log;
-      return stateDump;
+      return { log: ephemeral.log, ...kernelKeeper.dump() };
     },
 
-    start,
-
-    async run() {
-      if (!started) {
-        throw new Error('must do kernel.start() before run()');
-      }
-      // process all messages, until syscall.pause() is invoked
-      running = true;
-      while (running && !kernelKeeper.isRunQueueEmpty()) {
-        // eslint-disable-next-line no-await-in-loop
-        await processQueueMessage(kernelKeeper.getNextMsg());
-      }
-    },
-
-    async step() {
-      if (!started) {
-        throw new Error('must do kernel.start() before step()');
-      }
-      // process a single message
-      if (!kernelKeeper.isRunQueueEmpty()) {
-        await processQueueMessage(kernelKeeper.getNextMsg());
-      }
-    },
-
+    addImport,
+    addExport,
+    vatNameToID,
+    deviceNameToID,
     queueToExport,
   });
 

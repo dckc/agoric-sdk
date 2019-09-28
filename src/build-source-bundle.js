@@ -1,16 +1,18 @@
 import { rollup } from 'rollup';
 import resolve from 'rollup-plugin-node-resolve';
-import infixBang from '@agoric/acorn-infix-bang';
+import acornEventualSend from '@agoric/acorn-eventual-send';
 
 export default async function bundleSource(startFilename) {
+  const resolvedPath = require.resolve(startFilename);
   const bundle = await rollup({
-    input: require.resolve(startFilename),
+    input: resolvedPath,
     treeshake: false,
     external: ['@agoric/evaluate', '@agoric/nat', '@agoric/harden'],
     plugins: [resolve()],
-    acornInjectPlugins: [infixBang()],
+    acornInjectPlugins: [acornEventualSend()],
   });
   const { output } = await bundle.generate({
+    exports: 'named',
     format: 'cjs',
   });
   if (output.length !== 1) {
@@ -31,6 +33,7 @@ export default async function bundleSource(startFilename) {
   // ES6 module. The Vat controller will wrap it with parenthesis so it can
   // be evaluated and invoked to get at the exports.
 
+  const sourceMap = `//# sourceURL=${resolvedPath}\n`;
   source = `
 function getExport() {
 let exports = {};
@@ -42,5 +45,5 @@ return module.exports;
 }
 `;
 
-  return source;
+  return { source, sourceMap };
 }
