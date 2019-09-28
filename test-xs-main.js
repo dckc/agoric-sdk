@@ -27,6 +27,6 @@ export default function main() {
     report(htest.summary(), txt => {
       trace(`${txt}\n`);
     });
-  }, 500);
+  }, 2000);
   trace('# bye from main\n');
 }
