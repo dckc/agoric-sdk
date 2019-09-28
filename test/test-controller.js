@@ -8,17 +8,6 @@ function capdata(body, slots = []) {
   return harden({ body, slots });
 }
 
-test('load empty', async t => {
-  const config = {
-    vats: new Map(),
-    bootstrapIndexJS: undefined,
-  };
-  const controller = await buildVatController(config);
-  await controller.run();
-  t.ok(true);
-  t.end();
-});
-
 async function simpleCall(t, withSES) {
   const config = {
     vats: new Map([
@@ -56,31 +45,6 @@ async function simpleCall(t, withSES) {
   t.end();
 }
 
-test('simple call with SES', async t => {
-  await simpleCall(t, true);
-});
-
-test('simple call non-SES', async t => {
-  await simpleCall(t, false);
-});
-
-test('reject module-like sourceIndex', async t => {
-  const vats = new Map();
-  // the keys of 'vats' have a 'sourcepath' property which are vat source
-  // index strings: something that require() or rollup can use to
-  // import/stringify the source graph that should be loaded into the vat. We
-  // want this to be somewhere on local disk, so it should start with '/' or
-  // '.'. If it doesn't, the name will be treated as something to load from
-  // node_modules/ (i.e. something installed from npm), so we want to reject
-  // that.
-  vats.set('vat1', { sourcepath: 'vatsource' });
-  t.rejects(
-    async () => buildVatController({ vats }, false),
-    /sourceIndex must be relative/,
-  );
-  t.end();
-});
-
 async function bootstrap(t, withSES) {
   const config = await loadBasedir(
     path.resolve(__dirname, 'basedir-controller-2'),
@@ -93,13 +57,6 @@ async function bootstrap(t, withSES) {
   t.end();
 }
 
-test('bootstrap with SES', async t => {
-  await bootstrap(t, true);
-});
-
-test('bootstrap without SES', async t => {
-  await bootstrap(t, false);
-});
 
 async function bootstrapExport(t, withSES) {
   const config = await loadBasedir(
@@ -255,10 +212,56 @@ async function bootstrapExport(t, withSES) {
   t.end();
 }
 
-test('bootstrap export with SES', async t => {
-  await bootstrapExport(t, true);
-});
+export default function runTests() {
+  test('load empty', async t => {
+    const config = {
+      vats: new Map(),
+      bootstrapIndexJS: undefined,
+    };
+    const controller = await buildVatController(config, false);
+    await controller.run();
+    t.ok(true);
+    t.end();
+  });
 
-test('bootstrap export without SES', async t => {
-  await bootstrapExport(t, false);
-});
+  test('simple call with SES', async t => {
+    await simpleCall(t, true);
+  });
+
+  test('simple call non-SES', async t => {
+    await simpleCall(t, false);
+  });
+
+  test('reject module-like sourceIndex', async t => {
+    const vats = new Map();
+    // the keys of 'vats' have a 'sourcepath' property which are vat source
+    // index strings: something that require() or rollup can use to
+    // import/stringify the source graph that should be loaded into the vat. We
+    // want this to be somewhere on local disk, so it should start with '/' or
+    // '.'. If it doesn't, the name will be treated as something to load from
+    // node_modules/ (i.e. something installed from npm), so we want to reject
+    // that.
+    vats.set('vat1', { sourcepath: 'vatsource' });
+    t.rejects(
+      async () => buildVatController({ vats }, false),
+      /sourceIndex must be relative/,
+    );
+    t.end();
+  });
+
+  test('bootstrap with SES', async t => {
+    await bootstrap(t, true);
+  });
+
+  test('bootstrap without SES', async t => {
+    await bootstrap(t, false);
+  });
+
+  test('bootstrap export with SES', async t => {
+    await bootstrapExport(t, true);
+  });
+
+  test('bootstrap export without SES', async t => {
+    await bootstrapExport(t, false);
+  });
+}
