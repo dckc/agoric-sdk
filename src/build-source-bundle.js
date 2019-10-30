@@ -1,9 +1,10 @@
-import { rollup } from 'rollup';
-import resolve from 'rollup-plugin-node-resolve';
 import acornEventualSend from '@agoric/acorn-eventual-send';
 
-export default async function bundleSource(startFilename) {
-  const resolvedPath = require.resolve(startFilename);
+export default async function bundleSource(
+  startFilename,
+  { rollup, resolve, requireResolve },
+) {
+  const resolvedPath = requireResolve(startFilename);
   const bundle = await rollup({
     input: resolvedPath,
     treeshake: false,

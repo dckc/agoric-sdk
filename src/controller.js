@@ -1,7 +1,5 @@
 // eslint-disable-next-line no-redeclare
 /* global setImmediate */
-import fs from 'fs';
-import path from 'path';
 // import { rollup } from 'rollup';
 import harden from '@agoric/harden';
 import Nat from '@agoric/nat';
@@ -11,17 +9,16 @@ import makeDefaultEvaluateOptions from '@agoric/default-evaluate-options';
 
 import kernelSourceFunc from './bundles/kernel';
 import buildKernelNonSES from './kernel/index';
-import bundleSource from './build-source-bundle';
 import { insist } from './insist';
 import { insistCapData } from './capdata';
 import { parseVatSlot } from './parseVatSlots';
 
 const evaluateOptions = makeDefaultEvaluateOptions();
 
-export function loadBasedir(basedir) {
-  console.log(`= loading config from basedir ${basedir}`);
+export function loadBasedirRd(basedirRd) {
+  console.log(`= loading config from basedir ${basedirRd}`);
   const vats = new Map(); // name -> { sourcepath, options }
-  const subs = fs.readdirSync(basedir, { withFileTypes: true });
+  const subs = basedirRd.readdirSync({ withFileTypes: true });
   subs.forEach(dirent => {
     if (dirent.name.endsWith('~')) {
       return;
@@ -32,19 +29,19 @@ export function loadBasedir(basedir) {
       dirent.name.endsWith('.js')
     ) {
       const name = dirent.name.slice('vat-'.length, -'.js'.length);
-      const indexJS = path.resolve(basedir, dirent.name);
-      vats.set(name, { sourcepath: indexJS, options: {} });
+      const indexJSRd = basedirRd.resolve(dirent.name);
+      vats.set(name, { sourceRd: indexJSRd, options: {} });
     } else {
       console.log('ignoring ', dirent.name);
     }
   });
-  let bootstrapIndexJS = path.resolve(basedir, 'bootstrap.js');
+  let bootstrapIndexJSRd = basedirRd.resolve('bootstrap.js');
   try {
-    fs.statSync(bootstrapIndexJS);
+    bootstrapIndexJSRd.statSync();
   } catch (e) {
-    bootstrapIndexJS = undefined;
+    bootstrapIndexJSRd = undefined;
   }
-  return { vats, bootstrapIndexJS };
+  return { vats, bootstrapIndexJSRd };
 }
 
 function getKernelSource() {
@@ -128,19 +125,23 @@ function buildNonSESKernel(initialState) {
   return { kernel };
 }
 
-export async function buildVatController(config, withSES = true, argv = []) {
+export async function buildVatControllerRd(
+  configRd,
+  withSES = true,
+  argv = [],
+) {
   // todo: move argv into the config
-  const initialState = config.initialState || JSON.stringify({});
+  const initialState = configRd.initialState || JSON.stringify({});
   const { kernel, s, r } = withSES
     ? buildSESKernel(initialState)
     : buildNonSESKernel(initialState);
   // console.log('kernel', kernel);
 
-  async function addGenesisVat(name, sourceIndex, options = {}) {
-    console.log(`= adding vat '${name}' from ${sourceIndex}`);
-    if (!(sourceIndex[0] === '.' || path.isAbsolute(sourceIndex))) {
+  async function addGenesisVatRd(name, sourceIndexRd, options = {}) {
+    console.log(`= adding vat '${name}' from ${sourceIndexRd}`);
+    if (!(sourceIndexRd.toString()[0] === '.' || sourceIndexRd.isAbsolute())) {
       throw Error(
-        'sourceIndex must be relative (./foo) or absolute (/foo) not bare (foo)',
+        `sourceIndex must be relative (./foo) or absolute (/foo) not bare (foo: ${sourceIndexRd.toString()})`,
       );
     }
 
@@ -159,18 +160,18 @@ export async function buildVatController(config, withSES = true, argv = []) {
       // comms problem exists between otherwise-isolated code within a single
       // Vat so it doesn't really help anyways
       // const r = s.makeRequire({ '@agoric/harden': true, '@agoric/nat': Nat });
-      const { source, sourceMap } = await bundleSource(`${sourceIndex}`);
+      const { source, sourceMap } = await sourceIndexRd.bundleSource();
       const actualSource = `(${source})\n${sourceMap}`;
       setup = s.evaluate(actualSource, { require: r })().default;
     } else {
       // eslint-disable-next-line global-require,import/no-dynamic-require
-      setup = require(`${sourceIndex}`).default;
+      setup = require(`${sourceIndexRd}`).default;
     }
     kernel.addGenesisVat(name, setup, options);
   }
 
-  async function addGenesisDevice(name, sourceIndex, endowments) {
-    if (!(sourceIndex[0] === '.' || path.isAbsolute(sourceIndex))) {
+  async function addGenesisDeviceRd(name, sourceIndexRd, endowments) {
+    if (!(sourceIndexRd.toString()[0] === '.' || sourceIndexRd.isAbsolute())) {
       throw Error(
         'sourceIndex must be relative (./foo) or absolute (/foo) not bare (foo)',
       );
@@ -178,35 +179,35 @@ export async function buildVatController(config, withSES = true, argv = []) {
 
     let setup;
     if (withSES) {
-      const { source, sourceMap } = await bundleSource(`${sourceIndex}`);
+      const { source, sourceMap } = await sourceIndexRd.bundleSource();
       const actualSource = `(${source})\n${sourceMap}`;
       setup = s.evaluate(actualSource, { require: r })().default;
     } else {
       // eslint-disable-next-line global-require,import/no-dynamic-require
-      setup = require(`${sourceIndex}`).default;
+      setup = sourceIndexRd.require().default;
     }
     kernel.addGenesisDevice(name, setup, endowments);
   }
 
-  if (config.devices) {
-    for (const [name, srcpath, endowments] of config.devices) {
+  if (configRd.devices) {
+    for (const [name, srcRd, endowments] of configRd.devices) {
       // eslint-disable-next-line no-await-in-loop
-      await addGenesisDevice(name, srcpath, endowments);
+      await addGenesisDeviceRd(name, srcRd, endowments);
     }
   }
 
-  if (config.vats) {
-    for (const name of config.vats.keys()) {
-      const v = config.vats.get(name);
+  if (configRd.vats) {
+    for (const name of configRd.vats.keys()) {
+      const v = configRd.vats.get(name);
       // eslint-disable-next-line no-await-in-loop
-      await addGenesisVat(name, v.sourcepath, v.options || {});
+      await addGenesisVatRd(name, v.sourceRd, v.options || {});
     }
   }
 
   let bootstrapVatName;
-  if (config.bootstrapIndexJS) {
+  if (configRd.bootstrapIndexJSRd) {
     bootstrapVatName = '_bootstrap';
-    await addGenesisVat(bootstrapVatName, config.bootstrapIndexJS, {});
+    await addGenesisVatRd(bootstrapVatName, configRd.bootstrapIndexJSRd, {});
   }
 
   // start() may queue bootstrap if state doesn't say we did it already. It

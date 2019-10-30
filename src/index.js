@@ -1,10 +1,10 @@
-import { loadBasedir, buildVatController } from './controller';
+import { loadBasedirRd, buildVatControllerRd } from './controller';
 import { buildMailboxStateMap, buildMailbox } from './devices/mailbox';
 import { buildTimer } from './devices/timer';
 
 export {
-  loadBasedir,
-  buildVatController,
+  loadBasedirRd,
+  buildVatControllerRd,
   buildMailboxStateMap,
   buildMailbox,
   buildTimer,

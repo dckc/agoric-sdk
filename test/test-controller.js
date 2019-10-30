@@ -1,20 +1,18 @@
-import path from 'path';
 import harden from '@agoric/harden';
 import { test } from 'tape-promise/tape';
-import { buildVatController, loadBasedir } from '../src/index';
+import { buildVatControllerRd, loadBasedirRd } from '../src/index';
+import bundleSource from '../src/build-source-bundle';
 import { checkKT } from './util';
 
 function capdata(body, slots = []) {
   return harden({ body, slots });
 }
 
-async function simpleCall(t, withSES) {
-  const config = {
-    vats: new Map([
-      ['vat1', { sourcepath: require.resolve('./vat-controller-1') }],
-    ]),
+async function simpleCall(t, withSES, resolve) {
+  const configRd = {
+    vats: new Map([['vat1', { sourceRd: resolve('./vat-controller-1') }]]),
   };
-  const controller = await buildVatController(config, withSES);
+  const controller = await buildVatControllerRd(configRd, withSES);
   const data = controller.dump();
   const vat1 = controller.vatNameToID('vat1');
   t.deepEqual(data.vatTables, [{ vatID: vat1, state: { transcript: [] } }]);
@@ -45,23 +43,19 @@ async function simpleCall(t, withSES) {
   t.end();
 }
 
-async function bootstrap(t, withSES) {
-  const config = await loadBasedir(
-    path.resolve(__dirname, 'basedir-controller-2'),
-  );
+async function bootstrap(t, withSES, resolveTest) {
+  const configRd = await loadBasedirRd(resolveTest('basedir-controller-2'));
   // the controller automatically runs the bootstrap function.
   // basedir-controller-2/bootstrap.js logs "bootstrap called" and queues a call to
   // left[0].bootstrap
-  const c = await buildVatController(config, withSES);
+  const c = await buildVatControllerRd(configRd, withSES);
   t.deepEqual(c.dump().log, ['bootstrap called']);
   t.end();
 }
 
-async function bootstrapExport(t, withSES) {
-  const config = await loadBasedir(
-    path.resolve(__dirname, 'basedir-controller-3'),
-  );
-  const c = await buildVatController(config, withSES);
+async function bootstrapExport(t, withSES, resolveTest) {
+  const configRd = await loadBasedirRd(resolveTest('basedir-controller-3'));
+  const c = await buildVatControllerRd(configRd, withSES);
   const bootstrapVatID = c.vatNameToID('_bootstrap');
   const leftVatID = c.vatNameToID('left');
   const rightVatID = c.vatNameToID('right');
@@ -211,24 +205,24 @@ async function bootstrapExport(t, withSES) {
   t.end();
 }
 
-export default function runTests() {
+export default function runTests({ resolve, resolveTest }) {
   test('load empty', async t => {
-    const config = {
+    const configRd = {
       vats: new Map(),
-      bootstrapIndexJS: undefined,
+      bootstrapIndexJSRd: undefined,
     };
-    const controller = await buildVatController(config, false);
+    const controller = await buildVatControllerRd(configRd, false);
     await controller.run();
     t.ok(true);
     t.end();
   });
 
   test('simple call with SES', async t => {
-    await simpleCall(t, true);
+    await simpleCall(t, true, resolve);
   });
 
   test('simple call non-SES', async t => {
-    await simpleCall(t, false);
+    await simpleCall(t, false, resolve);
   });
 
   test('reject module-like sourceIndex', async t => {
@@ -240,32 +234,84 @@ export default function runTests() {
     // '.'. If it doesn't, the name will be treated as something to load from
     // node_modules/ (i.e. something installed from npm), so we want to reject
     // that.
-    vats.set('vat1', { sourcepath: 'vatsource' });
+    vats.set('vat1', {
+      sourceRd: harden({
+        toString() {
+          return 'vatsource';
+        },
+        isAbsolute() {
+          return false;
+        },
+      }),
+    });
     t.rejects(
-      async () => buildVatController({ vats }, false),
+      async () => buildVatControllerRd({ vats }, false),
       /sourceIndex must be relative/,
     );
     t.end();
   });
 
   test('bootstrap with SES', async t => {
-    await bootstrap(t, true);
+    await bootstrap(t, true, resolveTest);
   });
 
   test('bootstrap without SES', async t => {
-    await bootstrap(t, false);
+    await bootstrap(t, false, resolveTest);
   });
 
   test('bootstrap export with SES', async t => {
-    await bootstrapExport(t, true);
+    await bootstrapExport(t, true, resolveTest);
   });
 
   test('bootstrap export without SES', async t => {
-    await bootstrapExport(t, false);
+    await bootstrapExport(t, false, resolveTest);
   });
 }
 
-
 if (typeof require !== 'undefined' && typeof module !== 'undefined') {
-  runTests();
+  /* eslint-disable global-require */
+  const fs = require('fs');
+  const path = require('path');
+  const { rollup } = require('rollup');
+  const resolve = require('rollup-plugin-node-resolve');
+
+  // eslint-disable-next-line no-inner-declarations
+  function makeRd(myPath) {
+    const self = harden({
+      toString() {
+        return myPath;
+      },
+      isAbsolute() {
+        return path.isAbsolute(myPath);
+      },
+      resolve(other) {
+        return makeRd(path.resolve(myPath, other));
+      },
+      statSync() {
+        return fs.statSync(myPath);
+      },
+      readdirSync(options) {
+        return fs.readdirSync(myPath, options);
+      },
+      bundleSource() {
+        return bundleSource(myPath, {
+          resolve,
+          rollup,
+          requireResolve: require.resolve,
+        });
+      },
+    });
+    return self;
+  }
+
+  runTests(
+    harden({
+      resolve(specifier) {
+        return makeRd(require.resolve(specifier));
+      },
+      resolveTest(specifier) {
+        return makeRd(path.resolve(__dirname, specifier));
+      },
+    }),
+  );
 }
