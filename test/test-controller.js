@@ -268,14 +268,14 @@ export default function runTests({ resolve, resolveTest }) {
   });
 }
 
-if (typeof require !== 'undefined' && typeof module !== 'undefined') {
-  /* eslint-disable global-require */
-  const fs = require('fs');
-  const path = require('path');
-  const { rollup } = require('rollup');
-  const resolve = require('rollup-plugin-node-resolve');
-
-  // eslint-disable-next-line no-inner-declarations
+function nodeSourceAccess({
+  fs,
+  path,
+  dirname,
+  rollup,
+  resolvePlugin,
+  requireResolve,
+}) {
   function makeRd(myPath) {
     const self = harden({
       toString() {
@@ -295,23 +295,36 @@ if (typeof require !== 'undefined' && typeof module !== 'undefined') {
       },
       bundleSource() {
         return bundleSource(myPath, {
-          resolve,
+          resolve: resolvePlugin,
           rollup,
-          requireResolve: require.resolve,
+          requireResolve,
         });
       },
     });
     return self;
   }
 
+  return harden({
+    resolve(specifier) {
+      return makeRd(requireResolve(specifier));
+    },
+    resolveTest(specifier) {
+      return makeRd(path.resolve(dirname, specifier));
+    },
+  });
+}
+
+/** Access ambient authority only if invoked as script. */
+if (typeof require !== 'undefined' && typeof module !== 'undefined') {
+  /* eslint-disable global-require */
   runTests(
-    harden({
-      resolve(specifier) {
-        return makeRd(require.resolve(specifier));
-      },
-      resolveTest(specifier) {
-        return makeRd(path.resolve(__dirname, specifier));
-      },
+    nodeSourceAccess({
+      requireResolve: require.resolve,
+      fs: require('fs'),
+      path: require('path'),
+      dirname: __dirname,
+      rollup: require('rollup').rollup,
+      resolvePlugin: require('rollup-plugin-node-resolve'),
     }),
   );
 }
