@@ -1,5 +1,59 @@
 User-visible changes in SwingSet:
 
+## Release 0.3.0 (06-Nov-2019)
+
+* change Command Device (`buildCommand()`) to take `broadcastCallback` as an
+  argument, rather than set in a subsequent call (#185)
+* outsource vat/kernel source bundling with @agoric/bundle-source
+
+
+## Release 0.2.0 (27-Oct-2019)
+
+* add TimerVat (#178)
+* buildStorageInMemory: expose the Map too (#144)
+
+
+## Release 0.1.0 (16-Oct-2019)
+
+* update to SES-0.6.4 to fix a sandbox breach
+
+
+## Release 0.0.27 (08-Oct-2019)
+
+* Rewritten state management: hosts must now provide a "HostStorage" object
+  in the config record, and the kernel will use it for all state changes.
+  This HostStorage can be implemented with an in-memory Map object, or a
+  proper on-disk database. Hosts commit per-block checkpoints through their
+  HostStorage object, rather than asking the controller for the current
+  kernel state. (#144)
+* Fixed infinite loop caused by `x~.foo~.bar()` on a Presence `x`. This
+  performs an asynchronous property lookup followed by a method invocation,
+  and should behave mostly like `Promise.resolve(x).then(y => y.foo).then(z
+  => z.bar())`, except that `x` references a remote object, so cross-Vat
+  message sends are involved. Caused by
+  https://github.com/Agoric/eventual-send/issues/38 , fixed by updating to
+  eventual-send-0.4.0 .
+
+
+## Release 0.0.26 (02-Oct-2019)
+
+* update eventual-send to fix bugs revealed in cosmic-swingset testing (#169)
+
+
+## Release 0.0.25 (02-Oct-2019)
+
+* update to SES-0.6.3 to fix a sandbox breach
+* Vat code can now `import { E } from '@agoric/eventual-send'`, in addition
+  to receiving the `E` wrapper function from the liveSlots `createRootObject`
+  call. This allows downstream Vat code (like ERTP) to run unit tests without
+  SwingSet, by importing E like any other dependency. Note that `D` (used to
+  invoke device nodes) is not importable in this fashion. (#166)
+* Vat code can now use async property get with `x.~foo`, which will behave
+  somewhat like `Promise.resolve(x).then(obj => obj.foo)`. This does not
+  pipeline yet, but watch #167 for progress in fixing this. (#165)
+* internal state-management improvements
+
+
 ## Release 0.0.24 (26-Sep-2019)
 
 * update to @agoric/(evaluate,default-evaluate-options,eventual-send), to

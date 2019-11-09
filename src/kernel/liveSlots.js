@@ -1,5 +1,6 @@
 import harden from '@agoric/harden';
 import Nat from '@agoric/nat';
+import { E } from '@agoric/eventual-send';
 import { QCLASS, mustPassByPresence, makeMarshal } from '@agoric/marshal';
 import { insist } from '../insist';
 import { insistVatType, makeVatSlot, parseVatSlot } from '../parseVatSlots';
@@ -22,27 +23,18 @@ function build(syscall, _state, makeRoot, forVatID) {
   function makeQueued(slot) {
     /* eslint-disable no-use-before-define */
     const handler = {
-      GET(_o, prop) {
-        // Support: o![prop]!(...args)
-        return (...args) => queueMessage(slot, prop, args);
-      },
       POST(_o, prop, args) {
-        // Support: o![prop](...args).
+        // Support: o~.[prop](...args) remote method invocation
         return queueMessage(slot, prop, args);
       },
     };
     /* eslint-enable no-use-before-define */
 
     const pr = {};
-    pr.p = Promise.makeHandled((res, rej) => {
+    pr.p = Promise.makeHandled((res, rej, resolveWithPresence) => {
       pr.rej = rej;
-      pr.res = target => {
-        if (Object(target) !== target) {
-          // Not an object, needs no additional handler.
-          return res(target);
-        }
-        return res(target, handler);
-      };
+      pr.resPres = () => resolveWithPresence(handler);
+      pr.res = res;
     }, handler);
     // We harden this Promise because it feeds importPromise(), which is
     // where remote promises inside inbound arguments and resolutions are
@@ -159,14 +151,11 @@ function build(syscall, _state, makeRoot, forVatID) {
       if (type === 'object') {
         // this is a new import value
         // lsdebug(`assigning new import ${slot}`);
-        const presence = harden({
-          toString() {
-            return `[Presence ${slot}]`;
-          },
-        });
         // prepare a Promise for this Presence, so E(val) can work
         const pr = makeQueued(slot);
-        pr.res(presence);
+        const presence = pr.resPres();
+        presence.toString = () => `[Presence ${slot}]`;
+        harden(presence);
         val = presence;
         // lsdebug(` for presence`, val);
       } else if (type === 'promise') {
@@ -207,82 +196,6 @@ function build(syscall, _state, makeRoot, forVatID) {
 
     return done.p;
   }
-
-  /**
-   * A Proxy handler for E(x).
-   *
-   * @param {Promise} ep Promise with eventual send API
-   * @returns {ProxyHandler} the Proxy handler
-   */
-  function EPromiseHandler(ep) {
-    return {
-      get(_target, p, _receiver) {
-        if (`${p}` !== p) {
-          return undefined;
-        }
-        // Harden this Promise because it's our only opportunity to ensure
-        // p1=E(x).foo() is hardened. The Handled Promise API does not (yet)
-        // allow the handler to synchronously influence the promise returned
-        // by the handled methods, so we must freeze it from the outside. See
-        // #95 for details.
-        return (...args) => harden(ep.post(p, args));
-      },
-      deleteProperty(_target, p) {
-        return harden(ep.delete(p));
-      },
-      set(_target, p, value, _receiver) {
-        return harden(ep.put(p, value));
-      },
-      apply(_target, _thisArg, argArray = []) {
-        return harden(ep.post(undefined, argArray));
-      },
-      has(_target, _p) {
-        // We just pretend everything exists.
-        return true;
-      },
-    };
-  }
-
-  function E(x) {
-    // p = E(x).name(args)
-    //
-    // E(x) returns a proxy on which you can call arbitrary methods. Each of
-    // these method calls returns a promise. The method will be invoked on
-    // whatever 'x' designates (or resolves to) in a future turn, not this
-    // one. 'x' might be/resolve-to:
-    //
-    // * a local object: do x[name](args) in a future turn
-    // * a normal Promise: wait for x to resolve, then x[name](args)
-    // * a Presence: send message to remote Vat to do x[name](args)
-    // * a Promise that we returned earlier: send message to whichever Vat
-    //   gets to decide what the Promise resolves to
-
-    if (outstandingProxies.has(x)) {
-      throw Error('E(E(x)) is invalid, you probably want E(E(x).foo()).bar()');
-    }
-
-    const slot = valToSlot.get(x);
-
-    if (slot && parseVatSlot(slot).type === 'device') {
-      throw new Error(`E() does not accept device nodes`);
-    }
-
-    lsdebug(` treating as promise`);
-    const targetP = Promise.resolve(x);
-
-    // targetP might resolve to a Presence
-    const handler = EPromiseHandler(targetP);
-
-    const p = harden(new Proxy({}, handler));
-    outstandingProxies.add(p);
-    return p;
-  }
-  // Like Promise.resolve, except that if applied to a presence, it
-  // would be better for it to return the remote promise for this
-  // specimen, rather than a fresh local promise fulfilled by this
-  // specimen.
-  // TODO: for now, just alias Promise.resolve.
-  E.resolve = specimen => Promise.resolve(specimen);
 
   function DeviceHandler(slot) {
     return {

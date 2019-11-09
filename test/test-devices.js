@@ -1,6 +1,7 @@
 import { test } from 'tape-promise/tape';
 import harden from '@agoric/harden';
 import { buildVatController } from '../src/index';
+import { buildStorageInMemory } from '../src/hostStorage';
 import { buildMailboxStateMap, buildMailbox } from '../src/devices/mailbox';
 import buildCommand from '../src/devices/command';
 
@@ -181,11 +182,12 @@ test('d2.5 without SES', async t => {
 });
 
 async function testState(t, withSES) {
+  const { storage, getState } = buildStorageInMemory();
   const config = {
     vats: new Map(),
     devices: [['d3', require.resolve('./files-devices/device-3'), {}]],
     bootstrapIndexJS: require.resolve('./files-devices/bootstrap-3'),
-    initialState: JSON.stringify({}),
+    hostStorage: storage,
   };
 
   // The initial state should be missing (null). Then we set it with the call
@@ -194,7 +196,7 @@ async function testState(t, withSES) {
   const d3 = c1.deviceNameToID('d3');
   await c1.run();
   t.deepEqual(c1.dump().log, ['undefined', 'w+r', 'called', 'got {"s":"new"}']);
-  const s = JSON.parse(c1.getState());
+  const s = getState();
   t.deepEqual(JSON.parse(s[`${d3}.deviceState`]), { s: 'new' });
   t.deepEqual(JSON.parse(s[`${d3}.o.nextID`]), 10);
 
@@ -335,15 +337,13 @@ test('mailbox inbound with SES', async t => {
 });
 
 async function testCommandBroadcast(t, withSES) {
-  const cm = buildCommand();
+  const broadcasts = [];
+  const cm = buildCommand(body => broadcasts.push(body));
   const config = {
     vats: new Map(),
     devices: [['command', cm.srcPath, cm.endowments]],
     bootstrapIndexJS: require.resolve('./files-devices/bootstrap-2'),
   };
-
-  const broadcasts = [];
-  cm.registerBroadcastCallback(body => broadcasts.push(body));
 
   const c = await buildVatController(config, withSES, ['command1']);
   await c.run();
@@ -361,7 +361,7 @@ test('command broadcast with SES', async t => {
 });
 
 async function testCommandDeliver(t, withSES) {
-  const cm = buildCommand();
+  const cm = buildCommand(() => {});
   const config = {
     vats: new Map(),
     devices: [['command', cm.srcPath, cm.endowments]],
