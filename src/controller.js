@@ -1,8 +1,10 @@
 // eslint-disable-next-line no-redeclare
 /* global setImmediate */
 // import { rollup } from 'rollup';
+import assert from 'assert';
 import harden from '@agoric/harden';
 import Nat from '@agoric/nat';
+import bundleSource from '@agoric/bundle-source';
 import SES from 'ses';
 
 import makeDefaultEvaluateOptions from '@agoric/default-evaluate-options';
@@ -20,9 +22,70 @@ const evaluateOptions = makeDefaultEvaluateOptions();
 // as one of our root realm's global properties.
 evaluateOptions.shims.unshift('this.globalThis = this');
 
-export function loadBasedirRd(basedirRd) {
+export function nodeSourceAccess({
+  fs,
+  path,
+  rollup,
+  resolvePlugin,
+  requireModule,
+}) {
+  function makeRdModule(myPath) {
+    assert(path.isAbsolute(myPath));
+    const self = harden({
+      toString() {
+        return myPath;
+      },
+      statSync() {
+        return fs.statSync(myPath);
+      },
+      bundleSource() {
+        return bundleSource(myPath, 'getExport', {
+          resolvePlugin,
+          rollup,
+          pathResolve: path.resolve,
+        });
+      },
+    });
+    return self;
+  }
+
+  function makeRdDir(init) {
+    const myPath = path.resolve(init);
+
+    const self = harden({
+      toString() {
+        return myPath;
+      },
+      resolve(other) {
+        return makeRdModule(path.resolve(myPath, other));
+      },
+      readdirSync(options) {
+        return fs.readdirSync(myPath, options);
+      },
+    });
+    return self;
+  }
+
+  function requireAbsPath(sourcePath) {
+    if (sourcePath[0] !== '/') {
+      throw Error(
+        `sourceIndex must be absolute (/foo) not relative nor bare: ${sourcePath})`,
+      );
+    }
+    // eslint-disable-next-line global-require,import/no-dynamic-require
+    return requireModule(sourcePath);
+  }
+
+  return harden({
+    requireAbsPath,
+    makeRdModule,
+    makeRdDir,
+  });
+}
+
+export function loadBasedirRd(basedirRd, requireModule) {
   console.log(`= loading config from basedir ${basedirRd}`);
-  const vats = new Map(); // name -> { sourcepath, options }
+  const vats = new Map(); // name -> { sourceRd, options }
   const subs = basedirRd.readdirSync({ withFileTypes: true });
   subs.forEach(dirent => {
     if (dirent.name.endsWith('~')) {
@@ -46,7 +109,18 @@ export function loadBasedirRd(basedirRd) {
   } catch (e) {
     bootstrapIndexJSRd = undefined;
   }
-  return { vats, bootstrapIndexJSRd };
+
+  function requireAbsPath(sourcePath) {
+    if (sourcePath[0] !== '/') {
+      throw Error(
+        `sourceIndex must be absolute (/foo) not relative nor bare: ${sourcePath})`,
+      );
+    }
+    // eslint-disable-next-line global-require,import/no-dynamic-require
+    return requireModule(sourcePath);
+  }
+
+  return { vats, bootstrapIndexJSRd, requireAbsPath };
 }
 
 function getKernelSource() {
@@ -145,11 +219,6 @@ export async function buildVatControllerRd(
 
   async function addGenesisVatRd(name, sourceIndexRd, options = {}) {
     console.log(`= adding vat '${name}' from ${sourceIndexRd}`);
-    if (!(sourceIndexRd.toString()[0] === '.' || sourceIndexRd.isAbsolute())) {
-      throw Error(
-        `sourceIndex must be relative (./foo) or absolute (/foo) not bare (foo: ${sourceIndexRd.toString()})`,
-      );
-    }
 
     // we load the sourceIndex (and everything it imports), and expect to get
     // two symbols from each Vat: 'start' and 'dispatch'. The code in
@@ -171,7 +240,7 @@ export async function buildVatControllerRd(
       setup = s.evaluate(actualSource, { require: r })().default;
     } else {
       // eslint-disable-next-line global-require,import/no-dynamic-require
-      setup = require(`${sourceIndexRd}`).default;
+      setup = configRd.requireAbsPath(sourceIndexRd.toString()).default;
     }
     kernel.addGenesisVat(name, setup, options);
   }

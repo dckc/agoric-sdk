@@ -1,16 +1,22 @@
 import harden from '@agoric/harden';
-import bundleSource from '@agoric/bundle-source';
 import { test } from 'tape-promise/tape';
-import { buildVatControllerRd, loadBasedirRd } from '../src/index';
+import {
+  buildVatControllerRd,
+  loadBasedirRd,
+  nodeSourceAccess,
+} from '../src/index';
 import { checkKT } from './util';
 
 function capdata(body, slots = []) {
   return harden({ body, slots });
 }
 
-async function simpleCall(t, withSES, resolve) {
+async function simpleCall(t, withSES, resolveModule, requireAbsPath) {
   const configRd = {
-    vats: new Map([['vat1', { sourceRd: resolve('./vat-controller-1') }]]),
+    vats: new Map([
+      ['vat1', { sourceRd: resolveModule('./vat-controller-1') }],
+    ]),
+    requireAbsPath,
   };
   const controller = await buildVatControllerRd(configRd, withSES);
   const data = controller.dump();
@@ -43,8 +49,11 @@ async function simpleCall(t, withSES, resolve) {
   t.end();
 }
 
-async function bootstrap(t, withSES, resolveTest) {
-  const configRd = await loadBasedirRd(resolveTest('basedir-controller-2'));
+async function bootstrap(t, withSES, resolveTestDir, requireAbsPath) {
+  const configRd = await loadBasedirRd(
+    resolveTestDir('basedir-controller-2'),
+    requireAbsPath,
+  );
   // the controller automatically runs the bootstrap function.
   // basedir-controller-2/bootstrap.js logs "bootstrap called" and queues a call to
   // left[0].bootstrap
@@ -53,8 +62,11 @@ async function bootstrap(t, withSES, resolveTest) {
   t.end();
 }
 
-async function bootstrapExport(t, withSES, resolveTest) {
-  const configRd = await loadBasedirRd(resolveTest('basedir-controller-3'));
+async function bootstrapExport(t, withSES, resolveTestDir, requireAbsPath) {
+  const configRd = await loadBasedirRd(
+    resolveTestDir('basedir-controller-3'),
+    requireAbsPath,
+  );
   const c = await buildVatControllerRd(configRd, withSES);
   const bootstrapVatID = c.vatNameToID('_bootstrap');
   const leftVatID = c.vatNameToID('left');
@@ -205,7 +217,11 @@ async function bootstrapExport(t, withSES, resolveTest) {
   t.end();
 }
 
-export default function runTests({ resolve, resolveTest }) {
+export default function runTests({
+  requireAbsPath,
+  resolveModule,
+  resolveTestDir,
+}) {
   test('load empty', async t => {
     const configRd = {
       vats: new Map(),
@@ -218,11 +234,11 @@ export default function runTests({ resolve, resolveTest }) {
   });
 
   test('simple call with SES', async t => {
-    await simpleCall(t, true, resolve);
+    await simpleCall(t, true, resolveModule, requireAbsPath);
   });
 
   test('simple call non-SES', async t => {
-    await simpleCall(t, false, resolve);
+    await simpleCall(t, false, resolveModule, requireAbsPath);
   });
 
   test('reject module-like sourceIndex', async t => {
@@ -245,71 +261,40 @@ export default function runTests({ resolve, resolveTest }) {
       }),
     });
     t.rejects(
-      async () => buildVatControllerRd({ vats }, false),
-      /sourceIndex must be relative/,
+      async () => buildVatControllerRd({ vats, requireAbsPath }, false),
+      /must be absolute/,
     );
     t.end();
   });
 
   test('bootstrap with SES', async t => {
-    await bootstrap(t, true, resolveTest);
+    await bootstrap(t, true, resolveTestDir, requireAbsPath);
   });
 
   test('bootstrap without SES', async t => {
-    await bootstrap(t, false, resolveTest);
+    await bootstrap(t, false, resolveTestDir, requireAbsPath);
   });
 
   test('bootstrap export with SES', async t => {
-    await bootstrapExport(t, true, resolveTest);
+    await bootstrapExport(t, true, resolveTestDir, requireAbsPath);
   });
 
   test('bootstrap export without SES', async t => {
-    await bootstrapExport(t, false, resolveTest);
+    await bootstrapExport(t, false, resolveTestDir, requireAbsPath);
   });
 }
 
-function nodeSourceAccess({
-  fs,
-  path,
-  dirname,
-  rollup,
-  resolvePlugin,
-  requireResolve,
-}) {
-  function makeRd(myPath) {
-    const self = harden({
-      toString() {
-        return myPath;
-      },
-      isAbsolute() {
-        return path.isAbsolute(myPath);
-      },
-      resolve(other) {
-        return makeRd(path.resolve(myPath, other));
-      },
-      statSync() {
-        return fs.statSync(myPath);
-      },
-      readdirSync(options) {
-        return fs.readdirSync(myPath, options);
-      },
-      bundleSource() {
-        return bundleSource(myPath, 'getExport', {
-          resolvePlugin,
-          rollup,
-          pathResolve: path.resolve,
-        });
-      },
-    });
-    return self;
-  }
-
+function testAccess(
+  { requireAbsPath, makeRdModule, makeRdDir },
+  { path, dirname, requireResolve },
+) {
   return harden({
-    resolve(specifier) {
-      return makeRd(requireResolve(specifier));
+    requireAbsPath,
+    resolveModule(specifier) {
+      return makeRdModule(requireResolve(specifier));
     },
-    resolveTest(specifier) {
-      return makeRd(path.resolve(dirname, specifier));
+    resolveTestDir(dir) {
+      return makeRdDir(path.resolve(dirname, dir));
     },
   });
 }
@@ -318,13 +303,19 @@ function nodeSourceAccess({
 if (typeof require !== 'undefined' && typeof module !== 'undefined') {
   /* eslint-disable global-require */
   runTests(
-    nodeSourceAccess({
-      requireResolve: require.resolve,
-      fs: require('fs'),
-      path: require('path'),
-      dirname: __dirname,
-      rollup: require('rollup').rollup,
-      resolvePlugin: require('rollup-plugin-node-resolve'),
-    }),
+    testAccess(
+      nodeSourceAccess({
+        requireModule: require,
+        fs: require('fs'),
+        path: require('path'),
+        rollup: require('rollup').rollup,
+        resolvePlugin: require('rollup-plugin-node-resolve'),
+      }),
+      {
+        dirname: __dirname,
+        path: require('path'),
+        requireResolve: require.resolve,
+      },
+    ),
   );
 }
