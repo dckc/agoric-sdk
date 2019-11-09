@@ -294,10 +294,10 @@ function nodeSourceAccess({
         return fs.readdirSync(myPath, options);
       },
       bundleSource() {
-        return bundleSource(myPath, {
-          resolve: resolvePlugin,
+        return bundleSource(myPath, 'getExport', {
+          resolvePlugin,
           rollup,
-          requireResolve,
+          pathResolve: path.resolve,
         });
       },
     });

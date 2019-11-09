@@ -6,7 +6,6 @@ import Nat from '@agoric/nat';
 import SES from 'ses';
 
 import makeDefaultEvaluateOptions from '@agoric/default-evaluate-options';
-import bundleSource from '@agoric/bundle-source';
 
 import kernelSourceFunc from './bundles/kernel';
 import buildKernelNonSES from './kernel/index';
