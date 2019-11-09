@@ -1,7 +1,7 @@
 import harden from '@agoric/harden';
+import bundleSource from '@agoric/bundle-source';
 import { test } from 'tape-promise/tape';
 import { buildVatControllerRd, loadBasedirRd } from '../src/index';
-import bundleSource from '../src/build-source-bundle';
 import { checkKT } from './util';
 
 function capdata(body, slots = []) {
