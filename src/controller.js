@@ -245,12 +245,6 @@ export async function buildVatControllerRd(
   }
 
   async function addGenesisDeviceRd(name, sourceIndexRd, endowments) {
-    if (!(sourceIndexRd.toString()[0] === '.' || sourceIndexRd.isAbsolute())) {
-      throw Error(
-        'sourceIndex must be relative (./foo) or absolute (/foo) not bare (foo)',
-      );
-    }
-
     let setup;
     if (withSES) {
       const { source, sourceMap } = await sourceIndexRd.bundleSource();
