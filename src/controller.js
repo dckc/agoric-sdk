@@ -251,8 +251,7 @@ export async function buildVatControllerRd(
       const actualSource = `(${source})\n${sourceMap}`;
       setup = s.evaluate(actualSource, { require: r })().default;
     } else {
-      // eslint-disable-next-line global-require,import/no-dynamic-require
-      setup = sourceIndexRd.require().default;
+      setup = configRd.requireAbsPath(sourceIndexRd.toString()).default;
     }
     kernel.addGenesisDevice(name, setup, endowments);
   }
