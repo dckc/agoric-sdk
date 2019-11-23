@@ -83,7 +83,7 @@ export function nodeSourceAccess({
   });
 }
 
-export function loadBasedirRd(basedirRd, requireModule) {
+export function loadBasedir(basedirRd, requireModule) {
   console.log(`= loading config from basedir ${basedirRd}`);
   const vats = new Map(); // name -> { sourceRd, options }
   const subs = basedirRd.readdirSync({ withFileTypes: true });
@@ -204,7 +204,7 @@ function buildNonSESKernel(hostStorage) {
   return { kernel };
 }
 
-export async function buildVatControllerRd(
+export async function buildVatController(
   configRd,
   withSES = true,
   argv = [],

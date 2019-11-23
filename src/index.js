@@ -1,15 +1,15 @@
 import {
   nodeSourceAccess,
-  loadBasedirRd,
-  buildVatControllerRd,
+  loadBasedir,
+  buildVatController,
 } from './controller';
 import { buildMailboxStateMap, buildMailbox } from './devices/mailbox';
 import { buildTimer } from './devices/timer';
 
 export {
   nodeSourceAccess,
-  loadBasedirRd,
-  buildVatControllerRd,
+  loadBasedir,
+  buildVatController,
   buildMailboxStateMap,
   buildMailbox,
   buildTimer,
