@@ -11,7 +11,7 @@ import Nat from '@agoric/nat';
  * controller.run() when it returns true.
  */
 export function buildTimer() {
-  const srcPath = require.resolve('./timer-src');
+  const srcPath = '@agoric.timer-src.js';
   let devicePollFunction;
 
   function registerDevicePollFunction(pollFn) {

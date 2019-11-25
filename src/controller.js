@@ -1,26 +1,28 @@
 // eslint-disable-next-line no-redeclare
-/* global setImmediate */
 // import { rollup } from 'rollup';
 import assert from 'assert';
 import harden from '@agoric/harden';
 import Nat from '@agoric/nat';
-import bundleSource from '@agoric/bundle-source';
+//@@ import bundleSource from '@agoric/bundle-source';
 import SES from 'ses';
 
-import makeDefaultEvaluateOptions from '@agoric/default-evaluate-options';
+//@@ import makeDefaultEvaluateOptions from '@agoric/default-evaluate-options';
 
-import kernelSourceFunc from './bundles/kernel';
-import buildKernelNonSES from './kernel/index';
+//@@ import kernelSourceFunc from './bundles/kernel';
+import Resource from 'Resource';
+
+//@@ import buildKernelNonSES from './kernel/index';
 import { insist } from './insist';
 import { insistStorageAPI } from './storageAPI';
 import { insistCapData } from './capdata';
 import { parseVatSlot } from './parseVatSlots';
 import { buildStorageInMemory } from './hostStorage';
 
-const evaluateOptions = makeDefaultEvaluateOptions();
+//@@ const evaluateOptions = makeDefaultEvaluateOptions();
+const evaluateOptions = { shims: [] };
 // globalThis is standard, we want it to be frozen
 // as one of our root realm's global properties.
-evaluateOptions.shims.unshift('this.globalThis = this');
+//@@ evaluateOptions.shims.unshift('this.globalThis = this');
 
 export function nodeSourceAccess({
   fs,
@@ -124,7 +126,11 @@ export function loadBasedir(basedirRd, requireModule) {
 }
 
 function getKernelSource() {
-  return `(${kernelSourceFunc})`;
+  const kernelRes = new Resource("agoric.kernel.js");
+  const src = String.fromArrayBuffer(kernelRes.slice(0));
+  console.log(src.slice(0, 60) + '...');
+  const kernelExpr = `(${src.slice('export default '.length)})`;
+  return kernelExpr;
 }
 
 // this feeds the SES realm's (real/safe) confine*() back into the Realm
@@ -168,7 +174,7 @@ function makeEvaluate(e) {
   });
 }
 
-function buildSESKernel(hostStorage) {
+function buildSESKernel(hostStorage, setImmediate) {
   // console.log('transforms', transforms);
   const s = SES.makeSESRootRealm({
     ...evaluateOptions,
@@ -194,7 +200,7 @@ function buildSESKernel(hostStorage) {
   return { kernel, s, r };
 }
 
-function buildNonSESKernel(hostStorage) {
+function buildNonSESKernel(hostStorage, setImmediate) {
   // Evaluate shims to produce desired globals.
   // eslint-disable-next-line no-eval
   (evaluateOptions.shims || []).forEach(shim => (1, eval)(shim));
@@ -213,8 +219,8 @@ export async function buildVatController(
   const hostStorage = configRd.hostStorage || buildStorageInMemory().storage;
   insistStorageAPI(hostStorage);
   const { kernel, s, r } = withSES
-    ? buildSESKernel(hostStorage)
-    : buildNonSESKernel(hostStorage);
+	? buildSESKernel(hostStorage, configRd.setImmediate)
+	: buildNonSESKernel(hostStorage, configRd.setImmediate);
   // console.log('kernel', kernel);
 
   async function addGenesisVatRd(name, sourceIndexRd, options = {}) {
@@ -236,6 +242,7 @@ export async function buildVatController(
       // Vat so it doesn't really help anyways
       // const r = s.makeRequire({ '@agoric/harden': true, '@agoric/nat': Nat });
       const { source, sourceMap } = await sourceIndexRd.bundleSource();
+      console.log('@@bundleSource in controller done.');
       const actualSource = `(${source})\n${sourceMap}`;
       setup = s.evaluate(actualSource, { require: r })().default;
     } else {
@@ -247,7 +254,9 @@ export async function buildVatController(
   async function addGenesisDeviceRd(name, sourceIndexRd, endowments) {
     let setup;
     if (withSES) {
+      console.log('@@genesis device', { sourceIndexRd });
       const { source, sourceMap } = await sourceIndexRd.bundleSource();
+      console.log('bundeSource done@@@');
       const actualSource = `(${source})\n${sourceMap}`;
       setup = s.evaluate(actualSource, { require: r })().default;
     } else {
