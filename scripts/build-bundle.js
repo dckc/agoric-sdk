@@ -1,7 +1,12 @@
 import bundleSource from '@agoric/bundle-source';
 
 async function main(argv, pkg, { open, rollup, resolvePlugin, pathResolve }) {
-  if (argv.length < 4) {
+  if (argv.includes('--vats')) {
+    for (const src of argv.slice(3)) {
+      const dest = src.replace(/.js$/, '-src.js');
+      await bundle1(src, dest);
+    }
+  } else if (argv.length < 4) {
     for (const dev of ['mailbox', 'command', 'timer']) {
       const [startFilename, dest] = [`${pkg}/src/devices/${dev}-src.js`, `${pkg}/src/bundles/${dev}-src.js`];
       await bundle1(startFilename, dest);
