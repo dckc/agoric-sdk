@@ -6,6 +6,12 @@ async function main(argv, pkg, { open, rollup, resolvePlugin, pathResolve }) {
       const [startFilename, dest] = [`${pkg}/src/devices/${dev}-src.js`, `${pkg}/src/bundles/${dev}-src.js`];
       await bundle1(startFilename, dest);
     }
+    for (const [vat, src] of [['vattp', 'vat-tp/vattp'],
+			       ['comms', 'comms/index'],
+			       ['timer', 'vat-timerWrapper']]) {
+      const [startFilename, dest] = [`${pkg}/src/vats/${src}.js`, `${pkg}/src/bundles/vat-${vat}-src.js`];
+      await bundle1(startFilename, dest);
+    }
   } else {
     const [startFilename, dest] = argv.slice(2, 4);
     await bundle1(startFilename, dest);
