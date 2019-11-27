@@ -99,7 +99,7 @@ export function loadBasedir(basedirRd, requireModule) {
       dirent.name.endsWith('.js')
     ) {
       const name = dirent.name.slice('vat-'.length, -'.js'.length);
-      const indexJSRd = basedirRd.resolve(dirent.name);
+      const indexJSRd = basedirRd.join(dirent.name);
       vats.set(name, { sourceRd: indexJSRd, options: {} });
     } else {
       console.log('ignoring ', dirent.name);
