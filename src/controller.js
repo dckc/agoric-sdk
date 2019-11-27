@@ -105,7 +105,7 @@ export function loadBasedir(basedirRd, requireModule) {
       console.log('ignoring ', dirent.name);
     }
   });
-  let bootstrapIndexJSRd = basedirRd.resolve('bootstrap.js');
+  let bootstrapIndexJSRd = basedirRd.join('bootstrap.js');
   try {
     bootstrapIndexJSRd.statSync();
   } catch (e) {
