@@ -3,7 +3,7 @@ import bundleSource from '@agoric/bundle-source';
 async function main(argv, pkg, { open, rollup, resolvePlugin, pathResolve }) {
   if (argv.includes('--vats')) {
     for (const src of argv.slice(3)) {
-      const dest = src.replace(/.js$/, '-src.js');
+      const dest = src.replace(/vat-([^\.]+).js$/, 'vat_$1-src.js');
       await bundle1(src, dest);
     }
   } else if (argv.length < 4) {
@@ -14,7 +14,7 @@ async function main(argv, pkg, { open, rollup, resolvePlugin, pathResolve }) {
     for (const [vat, src] of [['vattp', 'vat-tp/vattp'],
 			       ['comms', 'comms/index'],
 			       ['timer', 'vat-timerWrapper']]) {
-      const [startFilename, dest] = [`${pkg}/src/vats/${src}.js`, `${pkg}/src/bundles/vat-${vat}-src.js`];
+      const [startFilename, dest] = [`${pkg}/src/vats/${src}.js`, `${pkg}/src/bundles/vat_${vat}-src.js`];
       await bundle1(startFilename, dest);
     }
   } else {
