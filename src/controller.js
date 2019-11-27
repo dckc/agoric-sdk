@@ -254,9 +254,7 @@ export async function buildVatController(
   async function addGenesisDeviceRd(name, sourceIndexRd, endowments) {
     let setup;
     if (withSES) {
-      console.log('@@genesis device', { sourceIndexRd });
       const { source, sourceMap } = await sourceIndexRd.bundleSource();
-      console.log('bundeSource done@@@');
       const actualSource = `(${source})\n${sourceMap}`;
       setup = s.evaluate(actualSource, { require: r })().default;
     } else {
