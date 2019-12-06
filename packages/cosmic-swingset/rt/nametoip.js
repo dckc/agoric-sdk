@@ -1,22 +1,23 @@
 // cribbed from https://gist.github.com/fffaraz/9d9170b57791c28ccda9255b48315168
 // https://en.wikipedia.org/wiki/Domain_Name_System#DNS_message_format
+// https://tools.ietf.org/html/rfc8427
 
 import dgram from 'dgram';  //@@node.js
 
 
 const DNS = Object.freeze({
-  flags({ qr, opcode, aa, tc, rd, ra, rcode }) {
-    return packBits([[qr, 1], [opcode, 4], [aa, 1], [tc, 1],
-		     [rd, 1], [ra, 1], [0 /*z*/, 3], [rcode, 4]]);
+  flags({ QR, Opcode, AA, TC, RD, RA, RCODE }) {
+    return packBits([[QR, 1], [Opcode, 4], [AA, 1], [TC, 1],
+		     [RD, 1], [RA, 1], [0 /*z*/, 3], [RCODE, 4]]);
   },
 
-  header({ id, flags, qd_count, an_count, ns_count, ar_count }) {
-    return packShorts([id, flags, qd_count, an_count, ns_count, ar_count ]);
+  header({ ID, flags, QDCOUNT, ANCOUNT, NSCOUNT, ARCOUNT }) {
+    return packShorts([ID, flags, QDCOUNT, ANCOUNT, NSCOUNT, ARCOUNT ]);
   },
 
-  question1(header, { name, qtype, qclass }) {
-    const namep = lengthPrefixed(name);
-    const q = packShorts([qtype, qclass]);
+  question1(header, { QNAME, QTYPE, QCLASS }) {
+    const namep = lengthPrefixed(QNAME);
+    const q = packShorts([QTYPE, QCLASS]);
     const msg = new Uint8Array(header.length + namep.length + q.length);
     msg.set(header);
     msg.set(namep, header.length);
@@ -26,43 +27,45 @@ const DNS = Object.freeze({
 
   decode(msg) {
     const headerFields = 6;
-    const [id, flagBits, qd_count, an_count, ns_count, ar_count] = unpackShorts(msg, headerFields);
-    const [qr, opcode, aa, tc, rd, ra, rcode] = unpackBits(flagBits, [1, 4, 1, 1,
+    const [ID, flagBits, QDCOUNT, ANCOUNT, NSCOUNT, ARCOUNT] = unpackShorts(msg, headerFields);
+    const [QR, Opcode, AA, TC, RD, RA, RCODE] = unpackBits(flagBits, [1, 4, 1, 1,
 								      1, 1, 3, 4]);
-    const flags = { qr, opcode, aa, tc, rd, ra, rcode };
+    const flags = { QR, Opcode, AA, TC, RD, RA, RCODE };
 
-    const questions = [];
+    const questionRRs = [];
     let offset = headerFields * 2;
-    for (let ix = 0; ix < qd_count; ix++) {
+    for (let ix = 0; ix < QDCOUNT; ix++) {
       const { name, count } = unpackName(msg, offset);
       offset += count;
       const [ qtype, qclass ] = unpackShorts(msg.slice(offset), 2);
       offset += 2 * 2;
-      questions.push({ name, qtype, qclass });
+      questionRRs.push({ name, qtype, qclass });
     }
 
-    const answers = [];
-    for (let ix = 0; ix < an_count; ix++) {
+    const answerRRs = [];
+    for (let ix = 0; ix < ANCOUNT; ix++) {
       const { name, count } = unpackName(msg, offset);
       offset += count;
-      const [ qtype, qclass, ttl_hi, ttl_lo, data_len ] = unpackShorts(msg.slice(offset), 5);
-      const ttl = ttl_hi << 0x10 | ttl_lo;
+      const [ TYPE, CLASS, ttl_hi, ttl_lo, data_len ] = unpackShorts(msg.slice(offset), 5);
+      const TTL = ttl_hi << 0x10 | ttl_lo;
       offset += 5 * 2;
       let rdata;
-      if (qtype === T_A) {
-	rdata = msg.slice(offset, offset + data_len);
+      if (TYPE === T_A) {
+	const b4 = msg.slice(offset, offset + data_len);
+	const rdataA = Array.from(b4).map(b => b.toString()).join('.');
+	rdata = { rdataA };
 	offset += data_len;
       } else {
 	const { name, count } = unpackName(msg, offset);
-	rdata = name;
+	rdata = { rdataDNAME: name };
 	offset += count;
       }
-      answers.push({ name, qtype, qclass, ttl, data_len, rdata });
+      answerRRs.push({ NAME: name, TYPE, CLASS, TTL, ...rdata });
     }
 
     return {
-      header: { id, flags, qd_count, an_count, ns_count, ar_count },
-      questions, answers
+      header: { ID, ...flags, QDCOUNT, ANCOUNT, NSCOUNT, ARCOUNT },
+      questionRRs, answerRRs
     };
   }
 });
@@ -158,28 +161,28 @@ function unpackName(buf, offset) {
 }
 
 
-function ngethostbyname(sock, server, id, hostname, query_type) {
+function ngethostbyname(sock, server, ID, hostname, query_type) {
   const port = 53;
   const address = server;
 
   const header = DNS.header({
-    id,
+    ID,
     flags: DNS.flags({
-      qr: 0,     // query
-      opcode: 0, // standard query
-      aa: 0,     // Not Authoritative
-      tc: 0,     // not truncated
-      rd: 1,     // Recursion Desired
-      ra: 0,     // Recursion not available
-      rcode: 0,
+      QR: 0,     // query
+      Opcode: 0, // standard query
+      AA: 0,     // Not Authoritative
+      TC: 0,     // not truncated
+      RD: 1,     // Recursion Desired
+      RA: 0,     // Recursion not available
+      RCODE: 0,
     }),
-    qd_count: 1, // 1 question
-    an_count: 0,
-    ns_count: 0,
-    ar_count: 0,
+    QDCOUNT: 1, // 1 question
+    ANCOUNT: 0,
+    NSCOUNT: 0,
+    ARCOUNT: 0,
   });
 
-  const q1 = DNS.question1(header, { name: hostname, qtype: query_type, qclass: 1 /* internet */ });
+  const q1 = DNS.question1(header, { QNAME: hostname, QTYPE: query_type, QCLASS: 1 /* internet */ });
   console.log('Sending packet...');
   sock.send(q1, port, address, (err) => {
     if (err) {
@@ -190,9 +193,8 @@ function ngethostbyname(sock, server, id, hostname, query_type) {
     console.log('raw:', msg);
     const response = DNS.decode(msg);
     console.log('response:', response);
-    const ip4 = Array.from(response.answers[0].rdata);
-    const ip4s = ip4.map(b => b.toString()).join('.');
-    console.log(ip4, ip4s);
+    const rdataA = response.answerRRs[0].rdataA;
+    console.log({ rdataA });
   });
 }
 
