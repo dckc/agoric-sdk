@@ -2,7 +2,14 @@
 // https://en.wikipedia.org/wiki/Domain_Name_System#DNS_message_format
 // https://tools.ietf.org/html/rfc8427
 
+import assert from 'assert';
 import dgram from 'dgram';  //@@node.js
+
+
+const RR = {
+  A: 1, // IPv4 address
+  AAAA: 28, // IPv6 address
+}
 
 
 const DNS = Object.freeze({
@@ -28,8 +35,8 @@ const DNS = Object.freeze({
   decode(msg) {
     const headerFields = 6;
     const [ID, flagBits, QDCOUNT, ANCOUNT, NSCOUNT, ARCOUNT] = unpackShorts(msg, headerFields);
-    const [QR, Opcode, AA, TC, RD, RA, RCODE] = unpackBits(flagBits, [1, 4, 1, 1,
-								      1, 1, 3, 4]);
+    const [QR, Opcode, AA, TC, RD, RA, _z, RCODE] = unpackBits(flagBits, [1, 4, 1, 1,
+									  1, 1, 3, 4]);
     const flags = { QR, Opcode, AA, TC, RD, RA, RCODE };
 
     const questionRRs = [];
@@ -37,9 +44,9 @@ const DNS = Object.freeze({
     for (let ix = 0; ix < QDCOUNT; ix++) {
       const { name, count } = unpackName(msg, offset);
       offset += count;
-      const [ qtype, qclass ] = unpackShorts(msg.slice(offset), 2);
+      const [ TYPE, CLASS ] = unpackShorts(msg.slice(offset), 2);
       offset += 2 * 2;
-      questionRRs.push({ name, qtype, qclass });
+      questionRRs.push({ NAME: name, TYPE, CLASS });
     }
 
     const answerRRs = [];
@@ -50,14 +57,16 @@ const DNS = Object.freeze({
       const TTL = ttl_hi << 0x10 | ttl_lo;
       offset += 5 * 2;
       let rdata;
-      if (TYPE === T_A) {
+      if (TYPE === RR.A) {
 	const b4 = msg.slice(offset, offset + data_len);
 	const rdataA = Array.from(b4).map(b => b.toString()).join('.');
 	rdata = { rdataA };
 	offset += data_len;
       } else {
-	const { name, count } = unpackName(msg, offset);
-	rdata = { rdataDNAME: name };
+	const raw = msg.slice(offset, offset + data_len);
+	const hex = b => ('0' + b.toString(16)).slice(-2);
+	const rdataHEX = Array.from(raw).map(hex).join('');
+	rdata = { rdataHEX };
 	offset += count;
       }
       answerRRs.push({ NAME: name, TYPE, CLASS, TTL, ...rdata });
@@ -74,7 +83,8 @@ const DNS = Object.freeze({
 function packBits(parts) {
   let out = 0x00;
   let shift = 0;
-  for (const [val, bits] of parts) {
+  const strap = [...parts].reverse();
+  for (const [val, bits] of strap) {
     const mask = (1 << bits) - 1;
     out = out | ((val & mask) << shift);
     shift += bits;
@@ -92,6 +102,7 @@ function unpackBits(short, parts) {
     out.push(val);
     shift += bits;
   }
+
   return out.reverse();
 }
 
@@ -139,6 +150,7 @@ function unpackName(buf, offset) {
       jumped = true;
     } else {
       name += String.fromCharCode(buf[offset]);
+      assert(name.length < 64);
     }
     offset++;
     if (!jumped) {
@@ -183,6 +195,7 @@ function ngethostbyname(sock, server, ID, hostname, query_type) {
   });
 
   const q1 = DNS.question1(header, { QNAME: hostname, QTYPE: query_type, QCLASS: 1 /* internet */ });
+  // console.log('decode Q:', DNS.decode(q1));
   console.log('Sending packet...');
   sock.send(q1, port, address, (err) => {
     if (err) {
@@ -192,21 +205,18 @@ function ngethostbyname(sock, server, ID, hostname, query_type) {
   sock.on('message', (msg, rinfo) => {
     console.log('raw:', msg);
     const response = DNS.decode(msg);
-    console.log('response:', response);
-    const rdataA = response.answerRRs[0].rdataA;
-    console.log({ rdataA });
+    // console.log('response:', response);
+    console.log(response.answerRRs);
   });
 }
-
-const T_A = 1; // IPv4 address
 
 function main({ process }) {
   const dns_servers = ["208.67.222.222",
 		       "208.67.220.220"];
-  const hostname = "ip4.me";
+  const hostname = "ip6.me";
   const sock = dgram.createSocket('udp4'); //UDP packet for DNS queries
 
-  ngethostbyname(sock, dns_servers[0], process.pid, hostname, T_A);
+  ngethostbyname(sock, dns_servers[0], process.pid, hostname, RR.AAAA);
 }
 
 main({ process });
