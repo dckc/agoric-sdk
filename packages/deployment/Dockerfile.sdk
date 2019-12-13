@@ -1,0 +1,18 @@
+# The install container
+FROM node:stretch AS install
+
+WORKDIR /usr/src/agoric-sdk
+COPY . .
+COPY --from=agoric/cosmic-swingset:latest /usr/src/app/lib/ packages/cosmic-swingset/lib/
+COPY --from=agoric/cosmic-swingset:latest /go/bin/ag-cosmos-helper /usr/local/bin/
+RUN ln -s agoric-sdk/packages/cosmic-swingset ../app
+RUN echo 'all:' > packages/cosmic-swingset/Makefile
+
+RUN yarn install
+
+RUN yarn build
+
+# By default, run the daemon with specified arguments.
+WORKDIR /usr/src/app
+EXPOSE 26657
+ENTRYPOINT [ "./lib/ag-chain-cosmos" ]
