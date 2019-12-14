@@ -5,15 +5,16 @@ export function makePath(filename, { File, Iterator }) {
 
   function readFileSync() {
     let file;
+    let contents;
     try {
       file = new File(filename);
+      contents = file.read(String);
     } catch(oops) {
       // not sure why xs loses error messages, but without logging, we just get:
       // xs-platform/pathlib.js:21: exception: throw!
       console.log({ filename, message: oops.message });
       throw(new Error(`${filename}: ${oops.message}`));
     }
-    const contents = file.read(String);
     file.close();
     return contents;
   }
