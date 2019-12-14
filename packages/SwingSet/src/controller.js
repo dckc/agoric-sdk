@@ -1,27 +1,94 @@
 // eslint-disable-next-line no-redeclare
-/* global setImmediate */
-import fs from 'fs';
-import path from 'path';
 // import { rollup } from 'rollup';
+import assert from 'assert';
 import harden from '@agoric/harden';
 import Nat from '@agoric/nat';
+//@@ import bundleSource from '@agoric/bundle-source';
 import SES from 'ses';
 
-import makeDefaultEvaluateOptions from '@agoric/default-evaluate-options';
-import bundleSource from '@agoric/bundle-source';
+//@@ import makeDefaultEvaluateOptions from '@agoric/default-evaluate-options';
 
-import kernelSourceFunc from './bundles/kernel';
-import buildKernelNonSES from './kernel/index';
+//@@ import kernelSourceFunc from './bundles/kernel';
+import Resource from 'Resource';
+
+//@@ import buildKernelNonSES from './kernel/index';
 import { insist } from './insist';
 import { insistStorageAPI } from './storageAPI';
 import { insistCapData } from './capdata';
 import { parseVatSlot } from './parseVatSlots';
 import { buildStorageInMemory } from './hostStorage';
 
-export function loadBasedir(basedir) {
-  console.log(`= loading config from basedir ${basedir}`);
-  const vats = new Map(); // name -> { sourcepath, options }
-  const subs = fs.readdirSync(basedir, { withFileTypes: true });
+//@@ const evaluateOptions = makeDefaultEvaluateOptions();
+const evaluateOptions = { shims: [] };
+// globalThis is standard, we want it to be frozen
+// as one of our root realm's global properties.
+//@@ evaluateOptions.shims.unshift('this.globalThis = this');
+
+export function nodeSourceAccess({
+  fs,
+  path,
+  rollup,
+  resolvePlugin,
+  requireModule,
+}) {
+  function makeRdModule(myPath) {
+    assert(path.isAbsolute(myPath));
+    const self = harden({
+      toString() {
+        return myPath;
+      },
+      statSync() {
+        return fs.statSync(myPath);
+      },
+      bundleSource() {
+        return bundleSource(myPath, 'getExport', {
+          resolvePlugin,
+          rollup,
+          pathResolve: path.resolve,
+        });
+      },
+    });
+    return self;
+  }
+
+  function makeRdDir(init) {
+    const myPath = path.resolve(init);
+
+    const self = harden({
+      toString() {
+        return myPath;
+      },
+      resolve(other) {
+        return makeRdModule(path.resolve(myPath, other));
+      },
+      readdirSync(options) {
+        return fs.readdirSync(myPath, options);
+      },
+    });
+    return self;
+  }
+
+  function requireAbsPath(sourcePath) {
+    if (sourcePath[0] !== '/') {
+      throw Error(
+        `sourceIndex must be absolute (/foo) not relative nor bare: ${sourcePath})`,
+      );
+    }
+    // eslint-disable-next-line global-require,import/no-dynamic-require
+    return requireModule(sourcePath);
+  }
+
+  return harden({
+    requireAbsPath,
+    makeRdModule,
+    makeRdDir,
+  });
+}
+
+export function loadBasedir(basedirRd, requireModule) {
+  console.log(`= loading config from basedir ${basedirRd}`);
+  const vats = new Map(); // name -> { sourceRd, options }
+  const subs = basedirRd.readdirSync({ withFileTypes: true });
   subs.forEach(dirent => {
     if (dirent.name.endsWith('~')) {
       return;
@@ -32,23 +99,38 @@ export function loadBasedir(basedir) {
       dirent.name.endsWith('.js')
     ) {
       const name = dirent.name.slice('vat-'.length, -'.js'.length);
-      const indexJS = path.resolve(basedir, dirent.name);
-      vats.set(name, { sourcepath: indexJS, options: {} });
+      const indexJSRd = basedirRd.join(dirent.name);
+      vats.set(name, { sourceRd: indexJSRd, options: {} });
     } else {
       console.log('ignoring ', dirent.name);
     }
   });
-  let bootstrapIndexJS = path.resolve(basedir, 'bootstrap.js');
+  let bootstrapIndexJSRd = basedirRd.join('bootstrap.js');
   try {
-    fs.statSync(bootstrapIndexJS);
+    bootstrapIndexJSRd.statSync();
   } catch (e) {
-    bootstrapIndexJS = undefined;
+    bootstrapIndexJSRd = undefined;
   }
-  return { vats, bootstrapIndexJS };
+
+  function requireAbsPath(sourcePath) {
+    if (sourcePath[0] !== '/') {
+      throw Error(
+        `sourceIndex must be absolute (/foo) not relative nor bare: ${sourcePath})`,
+      );
+    }
+    // eslint-disable-next-line global-require,import/no-dynamic-require
+    return requireModule(sourcePath);
+  }
+
+  return { vats, bootstrapIndexJSRd, requireAbsPath };
 }
 
 function getKernelSource() {
-  return `(${kernelSourceFunc})`;
+  const kernelRes = new Resource("agoric.kernel.js");
+  const src = String.fromArrayBuffer(kernelRes.slice(0));
+  console.log(src.slice(0, 60) + '...');
+  const kernelExpr = `(${src.slice('export default '.length)})`;
+  return kernelExpr;
 }
 
 // this feeds the SES realm's (real/safe) confine*() back into the Realm
@@ -95,7 +177,7 @@ function makeEvaluate(e) {
   });
 }
 
-function buildSESKernel(hostStorage) {
+function buildSESKernel(hostStorage, setImmediate) {
   // console.log('transforms', transforms);
   const evaluateOptions = makeDefaultEvaluateOptions();
   const { transforms, ...otherOptions } = evaluateOptions;
@@ -128,7 +210,7 @@ function buildSESKernel(hostStorage) {
   return { kernel, s, r };
 }
 
-function buildNonSESKernel(hostStorage) {
+function buildNonSESKernel(hostStorage, setImmediate) {
   // Evaluate shims to produce desired globals.
   const evaluateOptions = makeDefaultEvaluateOptions();
   // eslint-disable-next-line no-eval
@@ -139,22 +221,21 @@ function buildNonSESKernel(hostStorage) {
   return { kernel };
 }
 
-export async function buildVatController(config, withSES = true, argv = []) {
+export async function buildVatController(
+  configRd,
+  withSES = true,
+  argv = [],
+) {
   // todo: move argv into the config
-  const hostStorage = config.hostStorage || buildStorageInMemory().storage;
+  const hostStorage = configRd.hostStorage || buildStorageInMemory().storage;
   insistStorageAPI(hostStorage);
   const { kernel, s, r } = withSES
-    ? buildSESKernel(hostStorage)
-    : buildNonSESKernel(hostStorage);
+	? buildSESKernel(hostStorage, configRd.setImmediate)
+	: buildNonSESKernel(hostStorage, configRd.setImmediate);
   // console.log('kernel', kernel);
 
-  async function addGenesisVat(name, sourceIndex, options = {}) {
-    console.log(`= adding vat '${name}' from ${sourceIndex}`);
-    if (!(sourceIndex[0] === '.' || path.isAbsolute(sourceIndex))) {
-      throw Error(
-        'sourceIndex must be relative (./foo) or absolute (/foo) not bare (foo)',
-      );
-    }
+  async function addGenesisVatRd(name, sourceIndexRd, options = {}) {
+    console.log(`= adding vat '${name}' from ${sourceIndexRd}`);
 
     // we load the sourceIndex (and everything it imports), and expect to get
     // two symbols from each Vat: 'start' and 'dispatch'. The code in
@@ -171,54 +252,47 @@ export async function buildVatController(config, withSES = true, argv = []) {
       // comms problem exists between otherwise-isolated code within a single
       // Vat so it doesn't really help anyways
       // const r = s.makeRequire({ '@agoric/harden': true, '@agoric/nat': Nat });
-      const { source, sourceMap } = await bundleSource(`${sourceIndex}`);
+      const { source, sourceMap } = await sourceIndexRd.bundleSource();
+      console.log('@@bundleSource in controller done.');
       const actualSource = `(${source})\n${sourceMap}`;
       setup = s.evaluate(actualSource, { require: r })().default;
     } else {
-      // eslint-disable-next-line global-require,import/no-dynamic-require
-      setup = require(`${sourceIndex}`).default;
+      setup = configRd.requireAbsPath(sourceIndexRd.toString()).default;
     }
     kernel.addGenesisVat(name, setup, options);
   }
 
-  async function addGenesisDevice(name, sourceIndex, endowments) {
-    if (!(sourceIndex[0] === '.' || path.isAbsolute(sourceIndex))) {
-      throw Error(
-        'sourceIndex must be relative (./foo) or absolute (/foo) not bare (foo)',
-      );
-    }
-
+  async function addGenesisDeviceRd(name, sourceIndexRd, endowments) {
     let setup;
     if (withSES) {
-      const { source, sourceMap } = await bundleSource(`${sourceIndex}`);
+      const { source, sourceMap } = await sourceIndexRd.bundleSource();
       const actualSource = `(${source})\n${sourceMap}`;
       setup = s.evaluate(actualSource, { require: r })().default;
     } else {
-      // eslint-disable-next-line global-require,import/no-dynamic-require
-      setup = require(`${sourceIndex}`).default;
+      setup = configRd.requireAbsPath(sourceIndexRd.toString()).default;
     }
     kernel.addGenesisDevice(name, setup, endowments);
   }
 
-  if (config.devices) {
-    for (const [name, srcpath, endowments] of config.devices) {
+  if (configRd.devices) {
+    for (const [name, srcRd, endowments] of configRd.devices) {
       // eslint-disable-next-line no-await-in-loop
-      await addGenesisDevice(name, srcpath, endowments);
+      await addGenesisDeviceRd(name, srcRd, endowments);
     }
   }
 
-  if (config.vats) {
-    for (const name of config.vats.keys()) {
-      const v = config.vats.get(name);
+  if (configRd.vats) {
+    for (const name of configRd.vats.keys()) {
+      const v = configRd.vats.get(name);
       // eslint-disable-next-line no-await-in-loop
-      await addGenesisVat(name, v.sourcepath, v.options || {});
+      await addGenesisVatRd(name, v.sourceRd, v.options || {});
     }
   }
 
   let bootstrapVatName;
-  if (config.bootstrapIndexJS) {
+  if (configRd.bootstrapIndexJSRd) {
     bootstrapVatName = '_bootstrap';
-    await addGenesisVat(bootstrapVatName, config.bootstrapIndexJS, {});
+    await addGenesisVatRd(bootstrapVatName, configRd.bootstrapIndexJSRd, {});
   }
 
   // start() may queue bootstrap if state doesn't say we did it already. It

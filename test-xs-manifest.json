@@ -1,0 +1,40 @@
+{
+  "include": [
+    "$(MODDABLE)/examples/manifest_base.json",
+    "$(MODDABLE)/modules/files/file/manifest.json"
+  ],
+  "strip": [],
+  "creation": {
+    "keys": {
+      "available": 4096
+    },
+    "stack": 4096
+  },
+  "preload": [ "preload" ],
+  "modules": {
+    "vat-controller-1": [ "./test/vat-controller-1" ],
+    "test/basedir-controller-2/*": [ "./test/basedir-controller-2/*" ],
+    "test/basedir-controller-3/*": [ "./test/basedir-controller-3/*" ],
+    "fs": [ "./xs-platform/fs"],
+    "path": [ "./xs-platform/path"],
+    "ses": [ "./xs-platform/ses" ],
+    "main": [ "./test-xs-main" ],
+    "preload": [ "./xs-platform/preload" ],
+    "./test/*": [ "./test/*" ],
+    "./src/*": [ "./src/*" ],
+    "./src/bundles/*": [ "./src/bundles/*" ],
+    "./src/devices/*": [ "./src/devices/*" ],
+    "./src/kernel/*": [ "./src/kernel/*" ],
+    "./src/kernel/state/*": [ "./src/kernel/state/*" ],
+    "tape-promise/tape": [ "./node_modules/@agoric/tape-xs/tape" ],
+    "@agoric/harden": [ "./node_modules/@agoric/harden/src/deepFreeze" ],
+    "@agoric/eventual-send": [ "./node_modules/@agoric/eventual-send/dist/eventual-send.esm" ],
+    "@agoric/marshal": [ "./node_modules/@agoric/marshal/marshal" ],
+    "@agoric/nat": [ "./node_modules/@agoric/nat/dist/nat.esm" ],
+    "@agoric/default-evaluate-options": [ "./xs-platform/default-evaluate-options" ],
+    "@agoric/acorn-eventual-send": [ "./xs-platform/acorn-infix-bang"],
+    "rollup": [ "./xs-platform/rollup" ],
+    "rollup-plugin-node-resolve": [ "./xs-platform/rollup-plugin-node-resolve" ],
+    "xs-platform/*": [ "./xs-platform/*" ]
+  }
+}
