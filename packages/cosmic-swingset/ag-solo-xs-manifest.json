@@ -25,12 +25,12 @@
     "assert": "./xs-platform/emulate/assert",
     "ses": "./xs-platform/emulate/ses",
     "minimist": "./xs-platform/emulate/dummy",
-    "n-readlines": "./node_modules/n-readlines/readlines",
+    "n-readlines": "./xs_modules/n-readlines/readlines",
     "@agoric/harden": "./xs-platform/emulate/harden",
-    "@agoric/nat": [ "./node_modules/@agoric/nat/dist/nat.esm" ],
-    "@agoric/eventual-send": "./node_modules/@agoric/eventual-send/dist/eventual-send.esm",
-    "@agoric/swingset-vat/*": "./node_modules/@agoric/swingset-vat/src/*",
-    "@agoric/swingset-vat/devices/*": "./node_modules/@agoric/swingset-vat/src/devices/*"
+    "@agoric/nat": [ "./xs_modules/@agoric/nat/dist/nat.esm" ],
+    "@agoric/eventual-send": "./xs_modules/@agoric/eventual-send/dist/eventual-send.esm",
+    "@agoric/swingset-vat/*": "./xs_modules/@agoric/swingset-vat/src/*",
+    "@agoric/swingset-vat/devices/*": "./xs_modules/@agoric/swingset-vat/src/devices/*"
   },
   "preload": [
     "@agoric/eventual-send", "@agoric/harden", "@agoric/nat",
@@ -44,12 +44,12 @@
     "stack": 4096
   },
   "data": {
-    "agoric.kernel.js": "./node_modules/@agoric/swingset-vat/src/bundles/kernel",
-    "@agoric.mailbox-src": "./node_modules/@agoric/swingset-vat/src/bundles/mailbox-src",
-    "@agoric.command-src": "./node_modules/@agoric/swingset-vat/src/bundles/command-src",
-    "@agoric.timer-src": "./node_modules/@agoric/swingset-vat/src/bundles/timer-src",
-    "@agoric.comms": "./node_modules/@agoric/swingset-vat/src/bundles/vat_comms-src",
-    "@agoric.vattp": "./node_modules/@agoric/swingset-vat/src/bundles/vat_vattp-src",
-    "@agoric.vat-timerWrapper": "./node_modules/@agoric/swingset-vat/src/bundles/vat_timer-src"
+    "agoric.kernel.js": "../SwingSet/src/bundles/kernel",
+    "@agoric.mailbox-src": "../SwingSet/src/bundles/mailbox-src",
+    "@agoric.command-src": "../SwingSet/src/bundles/command-src",
+    "@agoric.timer-src": "../SwingSet/src/bundles/timer-src",
+    "@agoric.comms": "../SwingSet/src/bundles/vat_comms-src",
+    "@agoric.vattp": "../SwingSet/src/bundles/vat_vattp-src",
+    "@agoric.vat-timerWrapper": "../SwingSet/src/bundles/vat_timer-src"
   }
 }
