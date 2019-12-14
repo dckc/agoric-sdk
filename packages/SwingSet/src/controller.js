@@ -179,7 +179,8 @@ function makeEvaluate(e) {
 
 function buildSESKernel(hostStorage, setImmediate) {
   // console.log('transforms', transforms);
-  const evaluateOptions = makeDefaultEvaluateOptions();
+  // @@ const evaluateOptions = makeDefaultEvaluateOptions();
+  const evaluateOptions = { shims: [], transforms: [] };
   const { transforms, ...otherOptions } = evaluateOptions;
   const s = SES.makeSESRootRealm({
     ...otherOptions,
