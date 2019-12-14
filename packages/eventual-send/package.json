@@ -1,0 +1,45 @@
+{
+  "name": "@agoric/eventual-send",
+  "version": "0.5.0",
+  "description": "Extend a Promise class to implement the eventual-send API",
+  "main": "dist/eventual-send.cjs.js",
+  "module": "dist/eventual-send.esm.js",
+  "browser": "dist/eventual-send.umd.js",
+  "types": "src/index.d.ts",
+  "scripts": {
+    "test": "tape -r esm 'test/**/test*.js'",
+    "build": "rollup -c",
+    "lint-fix": "eslint --fix '**/*.{js,jsx}'",
+    "lint-check": "eslint '**/*.{js,jsx}'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Agoric/eventual-send.git"
+  },
+  "author": "Agoric",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/Agoric/eventual-send/issues"
+  },
+  "homepage": "https://github.com/Agoric/eventual-send#readme",
+  "dependencies": {
+    "@agoric/harden": "^0.0.4"
+  },
+  "devDependencies": {
+    "esm": "^3.2.7",
+    "rollup": "^1.2.2",
+    "tape": "^4.11.0",
+    "tape-promise": "^4.0.0"
+  },
+  "directories": {
+    "test": "test"
+  },
+  "keywords": [
+    "eventual send",
+    "wavy dot"
+  ],
+  "files": [
+    "src/index.d.ts",
+    "dist"
+  ]
+}

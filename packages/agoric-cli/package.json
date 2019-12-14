@@ -1,0 +1,46 @@
+{
+  "name": "agoric",
+  "version": "0.3.1",
+  "description": "Manage the Agoric Javascript smart contract platform",
+  "main": "lib/main.js",
+  "bin": "bin/agoric",
+  "files": [
+    "lib",
+    "template"
+  ],
+  "scripts": {
+    "build": "exit 0",
+    "test": "tape -r esm 'test/**/*.js'",
+    "lint-fix": "eslint --fix '**/*.{js,jsx}'",
+    "lint-check": "eslint '**/*.{js,jsx}'",
+    "lint-fix-jessie": "eslint -c '.eslintrc-jessie.js' --fix '**/*.{js,jsx}'",
+    "lint-check-jessie": "eslint -c '.eslintrc-jessie.js' '**/*.{js,jsx}'"
+  },
+  "devDependencies": {
+    "tap-spec": "^5.0.0",
+    "tape": "^4.11.0",
+    "tape-promise": "^4.0.0"
+  },
+  "dependencies": {
+    "@agoric/bundle-source": "^1.0.3",
+    "@agoric/captp": "^1.2.0",
+    "@agoric/evaluate": "^2.2.0",
+    "@agoric/eventual-send": "^0.5.0",
+    "chalk": "^2.4.2",
+    "esm": "^3.2.5",
+    "minimist": "^1.2.0",
+    "ws": "^7.2.0",
+    "yarn": "^1.19.1"
+  },
+  "keywords": [],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Agoric/agoric"
+  },
+  "author": "Agoric",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/Agoric/agoric/issues"
+  },
+  "homepage": "https://github.com/Agoric/agoric#readme"
+}
