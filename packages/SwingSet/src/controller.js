@@ -89,6 +89,7 @@ export function loadBasedir(basedirRd, requireModule) {
   console.log(`= loading config from basedir ${basedirRd}`);
   const vats = new Map(); // name -> { sourceRd, options }
   const subs = basedirRd.readdirSync({ withFileTypes: true });
+  subs.sort((a, b) => a.name === b.name ? 0 : a.name < b.name ? -1 : 1);
   subs.forEach(dirent => {
     if (dirent.name.endsWith('~')) {
       return;
