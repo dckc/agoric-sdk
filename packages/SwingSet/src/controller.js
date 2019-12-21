@@ -24,6 +24,9 @@ const evaluateOptions = { shims: [] };
 // as one of our root realm's global properties.
 //@@ evaluateOptions.shims.unshift('this.globalThis = this');
 
+const DEBUG_FLAG = false;
+const DEBUG = (...args) => { if (DEBUG_FLAG) { console.log(args); } };
+
 export function nodeSourceAccess({
   fs,
   path,
@@ -129,7 +132,7 @@ export function loadBasedir(basedirRd, requireModule) {
 function getKernelSource() {
   const kernelRes = new Resource("agoric.kernel.js");
   const src = String.fromArrayBuffer(kernelRes.slice(0));
-  console.log(src.slice(0, 60) + '...');
+  DEBUG(src.slice(0, 60) + '...');
   const kernelExpr = `(${src.slice('export default '.length)})`;
   return kernelExpr;
 }
@@ -255,7 +258,7 @@ export async function buildVatController(
       // Vat so it doesn't really help anyways
       // const r = s.makeRequire({ '@agoric/harden': true, '@agoric/nat': Nat });
       const { source, sourceMap } = await sourceIndexRd.bundleSource();
-      console.log('@@bundleSource in controller done.');
+      DEBUG('bundleSource in controller done.');
       const actualSource = `(${source})\n${sourceMap}`;
       setup = s.evaluate(actualSource, { require: r })().default;
     } else {

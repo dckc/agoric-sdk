@@ -4,9 +4,12 @@ import harden from '@agoric/harden';
 import Nat from '@agoric/nat';
 
 export function eval2(expr, endowments) {
-  console.log('@@eval2 endowments:',
-	      JSON.stringify(Object.entries(endowments)
-			     .map(([k, v]) => [k, typeof v])));
+const DEBUG_FLAG = true;
+const DEBUG = (...args) => { if (DEBUG_FLAG) { console.log('===ses:', args); } };
+
+  DEBUG('evaluateExpr endowments:',
+	JSON.stringify(Object.entries(endowments)
+		       .map(([k, v]) => [k, typeof v])));
   // ISSUE: check that params are valid identifiers
   const params = Object.keys(endowments || {}).join(', ');
   const wrap = `(function ({${params}}) { return ${expr}; })`;
@@ -14,16 +17,16 @@ export function eval2(expr, endowments) {
   try {
     f = (1, eval)(wrap);
   } catch (oops) {
-    console.log('@@eval wrap failed:', oops.message, wrap);
+    DEBUG('eval wrap failed:', oops.message, wrap);
     throw oops;
   }
   const out = f(endowments);
-  console.log('@@eval2 =>', typeof out);
+  DEBUG('evaluateExpr =>', typeof out);
   return out;
 }
 
 function agRequire(modSpec) {
-  console.log(`agRequire(${modSpec})\n`);
+  DEBUG(`agRequire(${modSpec})\n`);
   switch(modSpec) {
   case '@agoric/harden':
     return harden({ default: harden });
@@ -52,7 +55,7 @@ const makeRealmSrc = `(
 function makeRealm() {
   return harden({
     makeRequire(options) {
-      console.log('@@makeRequire', {optionKeys: Object.keys(options)});
+      DEBUG('makeRequire', {optionKeys: Object.keys(options)});
       return agRequire;
     },
     evaluate: eval2,
@@ -76,7 +79,7 @@ export function makeSESRootRealm(options) {
   const c = makeCompartment();
   const makeRealm = c.export.eval2(makeRealmSrc, { makeCompartment, eval2, console, agRequire, harden });
   const realm = makeRealm();
-  console.log('@@new realm:', typeof realm.makeRequire({}));
+  DEBUG('new realm:', typeof realm.makeRequire({}));
   return realm;
 }
 

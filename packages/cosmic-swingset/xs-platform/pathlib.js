@@ -1,5 +1,8 @@
 const harden = x => Object.freeze(x, true);
 
+const DEBUG_FLAG = false;
+const DEBUG = (...args) => { if (DEBUG_FLAG) { console.log(...args); } };
+
 export function makePath(filename, { File, Iterator }) {
   const mk = there => makePath(there, { File, Iterator });
 
@@ -97,7 +100,7 @@ export function makePath(filename, { File, Iterator }) {
     } else {
       throw new Error(`expected vat-NAME.js; got: ${filename}`);
     }
-    console.log(`@@bundleSource ${filename} -> ${bundlePath}`);
+    DEBUG(`bundleSource ${filename} -> ${bundlePath}`);
     const src = mk(bundlePath).readFileSync();
     return {
       source: src.replace(/^export default /, ''),
