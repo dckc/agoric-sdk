@@ -3,10 +3,11 @@
 import harden from '@agoric/harden';
 import Nat from '@agoric/nat';
 
-export function eval2(expr, endowments) {
 const DEBUG_FLAG = true;
 const DEBUG = (...args) => { if (DEBUG_FLAG) { console.log('===ses:', args); } };
 
+
+export function evaluateExpr(expr, endowments) {
   DEBUG('evaluateExpr endowments:',
 	JSON.stringify(Object.entries(endowments)
 		       .map(([k, v]) => [k, typeof v])));
@@ -25,6 +26,26 @@ const DEBUG = (...args) => { if (DEBUG_FLAG) { console.log('===ses:', args); } }
   return out;
 }
 
+function evaluateProgram(src, endowments) {
+  return evaluateExpr(`(() => { ${src} })()`, endowments);
+}
+
+function evaluateModule(src, endowments) {
+  throw '@@TODO!';
+}
+
+function makeEvaluators(options) {
+  if(Object.keys(options).length > 0) {
+    console.log('WARNING: not implemented:', Object.keys(options));
+  }
+
+  return harden({
+    evaluateExpr,
+    evaluateProgram,
+    evaluateModule,
+  });
+}
+
 function agRequire(modSpec) {
   DEBUG(`agRequire(${modSpec})\n`);
   switch(modSpec) {
@@ -33,8 +54,13 @@ function agRequire(modSpec) {
   case '@agoric/nat':
     return harden({ default: Nat });
   case '@agoric/evaluate':
-    console.log('@@TODO: details of @agoric/evaluate');
-    return harden({ default: eval2 });
+    return harden({
+      default: evaluateExpr,
+      evaluateExpr,
+      evaluateProgram,
+      evaluateModule,
+      makeEvaluators,
+    });
   default:
     throw('bad module or something?');
   }
@@ -58,7 +84,7 @@ function makeRealm() {
       DEBUG('makeRequire', {optionKeys: Object.keys(options)});
       return agRequire;
     },
-    evaluate: eval2,
+    evaluate: evaluateExpr,
     global: {
       Realm: {
 	makeCompartment,
@@ -77,7 +103,7 @@ export function makeSESRootRealm(options) {
   const makeCompartment = (...args) => new Compartment('ses', { ...optEndowments, SES }, map);
 
   const c = makeCompartment();
-  const makeRealm = c.export.eval2(makeRealmSrc, { makeCompartment, eval2, console, agRequire, harden });
+  const makeRealm = c.export.evaluateExpr(makeRealmSrc, { makeCompartment, evaluateExpr, DEBUG, agRequire, harden });
   const realm = makeRealm();
   DEBUG('new realm:', typeof realm.makeRequire({}));
   return realm;
