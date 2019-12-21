@@ -30,7 +30,7 @@ vat-device-bundles: ../SwingSet/src/bundles/mailbox-src.js
  ../SwingSet/src/bundles/mailbox-src.js:
 	cd ../SwingSet && node -r esm scripts/build-bundle.js
 
-debug-build: xs_modules
+debug-build: xs_modules vat-device-bundles t3 t3/vats/bootstrap-src.js
 	mcconfig -d -p lin -m ag-solo-xs-manifest.json
 
 xs_modules: ../../node_modules
