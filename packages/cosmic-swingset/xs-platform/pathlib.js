@@ -8,7 +8,12 @@ export function makePath(filename, { File, Iterator }) {
     let contents;
     try {
       file = new File(filename);
-      contents = file.read(String);
+      if (file.length === 0) {
+	// avoid: read past end of file
+	contents = '';
+      } else {
+	contents = file.read(String);
+      }
     } catch(oops) {
       // not sure why xs loses error messages, but without logging, we just get:
       // xs-platform/pathlib.js:21: exception: throw!
@@ -118,7 +123,11 @@ export function makePath(filename, { File, Iterator }) {
     },
     readFileSync,
     readlinesSync() {
-      return readFileSync().replace(/\n$/, '').split('\n');
+      const text = readFileSync();
+      if (text === '') {
+	return [];
+      }
+      return text.replace(/\n$/, '').split('\n');
     },
     readdirSync,
     readdir,
