@@ -12,10 +12,9 @@ jobs:
     - name: install moddable SDK
       run: curl -L https://github.com/dckc/moddable/releases/download/ag01/moddable-15c57243-lin.tgz | tar xzf -
     - name: build moddable hello worl example
-      env:
-        MODDABLE: "{{ env.PWD }}/moddable"
-        PATH: "{{ env.PATH }}:{{ env.MODDABLE }}/build/bin/lin/release"
       run: |
+        export MODDABLE=$PWD/moddable
+        export PATH=$PATH:$MODDABLE/build/bin/lin/release
         cd $MODDABLE/examples/helloworld
         mcconfig -d -m -p lin
     - name: more TODO
