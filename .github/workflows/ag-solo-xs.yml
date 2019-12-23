@@ -11,6 +11,10 @@ jobs:
     - uses: actions/checkout@v1
     - name: install moddable SDK
       run: curl -L https://github.com/dckc/moddable/releases/download/ag01/moddable-15c57243-lin.tgz | tar xzf -
+    - name: yarn install
+      run: yarn install
+    - name: yarn build
+      run: yarn build
     - name: build and run ag-solo for xs
       run: |
         export MODDABLE=$PWD/moddable
