@@ -10,10 +10,10 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: install moddable SDK
-      run: curl https://github.com/dckc/moddable/releases/download/ag01/moddable-15c57243-lin.tgz | tar -C $HOME xzf -
+      run: curl https://github.com/dckc/moddable/releases/download/ag01/moddable-15c57243-lin.tgz | tar xzf -
     - name: build moddable hello worl example
       env:
-        MODDABLE: $HOME/moddable      
+        MODDABLE: `/bin/pwd`/moddable      
         PATH: $PATH:$MODDABLE/build/bin/lin/release
       run: |
         cd $MODDABLE/examples/helloworld
