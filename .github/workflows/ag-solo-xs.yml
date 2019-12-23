@@ -9,8 +9,18 @@ jobs:
     
     steps:
     - uses: actions/checkout@v1
-    - name: install moddable SDK
-      run: curl -L https://github.com/dckc/moddable/releases/download/ag01/moddable-15c57243-lin.tgz | tar xzf -
+    - name: cache Modddable SDK
+      uses: actions/cache@v1
+      with:
+        path: moddable
+        key: ${{ runner.os }}-node-67d99e74
+    - name: install moddable SDK with x-cli-lin platform
+      run: curl -L https://github.com/dckc/moddable/releases/download/ag02/moddable-67d99e74-lin.tgz | tar xzf -
+    - name: cache node modules
+      uses: actions/cache@v1
+      with:
+        path: ~/.cache/yarn
+        key: ${{ runner.os }}-node-${{ hashFiles('**/yarn.lock') }}
     - name: yarn install
       run: yarn install
     - name: yarn build
