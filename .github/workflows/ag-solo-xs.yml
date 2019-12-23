@@ -18,6 +18,7 @@ jobs:
     - name: build and run ag-solo for xs
       run: |
         export MODDABLE=$PWD/moddable
-        export PATH=$PATH:$MODDABLE/build/bin/lin/release
+        export PATH=$MODDABLE/build/bin/lin/release:$PATH
+        ls $MODDABLE/build/bin/lin/release
         cd packages/cosmic-swingset
-        make -f ag-solo-xs.mk
+        make -f ag-solo-xs.mk MODDABLE=$MODDABLE
