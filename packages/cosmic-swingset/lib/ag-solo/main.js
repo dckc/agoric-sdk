@@ -5,7 +5,8 @@ import { insist } from './insist';
 import bundle from './bundle';
 import initBasedir from './init-basedir';
 import setGCIIngress from './set-gci-ingress';
-import start from './start';
+//TODO: finish splitting ag-solo init-basedir from ag-solo start
+//@@ import start from './start';
 
 import makeNodePath from './pathlib';
 

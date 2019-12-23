@@ -13,8 +13,7 @@ release-build: xs_modules vat-device-bundles t3 t3/vats/bootstrap-src.js
 	$(MODDABLE)/build/bin/lin/release/$(PKG) $(BASEDIR)
 
 t3:
-	echo check out master and make scenario3-setup
-	exit 1
+	make scenario3-setup
 
 # bundle all the vats in t3/vats
 t3/vats/bootstrap-src.js: t3/vats/bootstrap.js

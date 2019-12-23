@@ -82,6 +82,9 @@ export default function makeNodePath(filename, { fs, path, temp }) {
       // console.log('resolve', { others });
       return make(path.resolve(filename, ...others));
     },
+    existsSync() {
+      return fs.existsSync(filename);
+    },
     statSync() {
       // console.log('statSync', { filename });
       return fs.statSync(filename);
