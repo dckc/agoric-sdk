@@ -1,0 +1,23 @@
+name: ag-solo on xs
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v1
+    - name: install moddable SDK
+      run: curl https://github.com/dckc/moddable/releases/download/ag01/moddable-15c57243-lin.tgz | tar -C $HOME xzf -
+    - name: set MODDABLE env
+      env:
+        MODDABLE: $HOME/moddable      
+    - name: add moddable SDK to PATH
+      env:
+        PATH: $PATH:$MODDABLE/build/bin/lin/release
+    - name: build moddable hello worl example
+      run: "cd $MODDABLE/examples/helloworld && mcconfig -d -m -p lin"
+    - name: more TODO
+      run: exit 1
