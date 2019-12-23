@@ -131,7 +131,7 @@ export function buildMailboxStateMap() {
 }
 
 export function buildMailbox(state) {
-  const srcPath = require.resolve('./mailbox-src');
+  const srcPath = '@agoric.mailbox-src.js';
 
   // endowments made available to the inner half
   let inboundCallback;

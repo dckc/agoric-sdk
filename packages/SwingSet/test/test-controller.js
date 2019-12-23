@@ -1,31 +1,24 @@
-import path from 'path';
 import harden from '@agoric/harden';
 import { test } from 'tape-promise/tape';
-import { buildVatController, loadBasedir } from '../src/index';
+import {
+  buildVatControllerRd,
+  loadBasedirRd,
+  nodeSourceAccess,
+} from '../src/index';
 import { checkKT } from './util';
 
 function capdata(body, slots = []) {
   return harden({ body, slots });
 }
 
-test('load empty', async t => {
-  const config = {
-    vats: new Map(),
-    bootstrapIndexJS: undefined,
-  };
-  const controller = await buildVatController(config);
-  await controller.run();
-  t.ok(true);
-  t.end();
-});
-
-async function simpleCall(t, withSES) {
-  const config = {
+async function simpleCall(t, withSES, resolveModule, requireAbsPath) {
+  const configRd = {
     vats: new Map([
-      ['vat1', { sourcepath: require.resolve('./vat-controller-1') }],
+      ['vat1', { sourceRd: resolveModule('./vat-controller-1') }],
     ]),
+    requireAbsPath,
   };
-  const controller = await buildVatController(config, withSES);
+  const controller = await buildVatControllerRd(configRd, withSES);
   const data = controller.dump();
   const vat1 = controller.vatNameToID('vat1');
   t.deepEqual(data.vatTables, [{ vatID: vat1, state: { transcript: [] } }]);
@@ -56,56 +49,25 @@ async function simpleCall(t, withSES) {
   t.end();
 }
 
-test('simple call with SES', async t => {
-  await simpleCall(t, true);
-});
-
-test('simple call non-SES', async t => {
-  await simpleCall(t, false);
-});
-
-test('reject module-like sourceIndex', async t => {
-  const vats = new Map();
-  // the keys of 'vats' have a 'sourcepath' property which are vat source
-  // index strings: something that require() or rollup can use to
-  // import/stringify the source graph that should be loaded into the vat. We
-  // want this to be somewhere on local disk, so it should start with '/' or
-  // '.'. If it doesn't, the name will be treated as something to load from
-  // node_modules/ (i.e. something installed from npm), so we want to reject
-  // that.
-  vats.set('vat1', { sourcepath: 'vatsource' });
-  t.rejects(
-    async () => buildVatController({ vats }, false),
-    /sourceIndex must be relative/,
-  );
-  t.end();
-});
-
-async function bootstrap(t, withSES) {
-  const config = await loadBasedir(
-    path.resolve(__dirname, 'basedir-controller-2'),
+async function bootstrap(t, withSES, resolveTestDir, requireAbsPath) {
+  const configRd = await loadBasedirRd(
+    resolveTestDir('basedir-controller-2'),
+    requireAbsPath,
   );
   // the controller automatically runs the bootstrap function.
   // basedir-controller-2/bootstrap.js logs "bootstrap called" and queues a call to
   // left[0].bootstrap
-  const c = await buildVatController(config, withSES);
+  const c = await buildVatControllerRd(configRd, withSES);
   t.deepEqual(c.dump().log, ['bootstrap called']);
   t.end();
 }
 
-test('bootstrap with SES', async t => {
-  await bootstrap(t, true);
-});
-
-test('bootstrap without SES', async t => {
-  await bootstrap(t, false);
-});
-
-async function bootstrapExport(t, withSES) {
-  const config = await loadBasedir(
-    path.resolve(__dirname, 'basedir-controller-3'),
+async function bootstrapExport(t, withSES, resolveTestDir, requireAbsPath) {
+  const configRd = await loadBasedirRd(
+    resolveTestDir('basedir-controller-3'),
+    requireAbsPath,
   );
-  const c = await buildVatController(config, withSES);
+  const c = await buildVatControllerRd(configRd, withSES);
   const bootstrapVatID = c.vatNameToID('_bootstrap');
   const leftVatID = c.vatNameToID('left');
   const rightVatID = c.vatNameToID('right');
@@ -255,10 +217,105 @@ async function bootstrapExport(t, withSES) {
   t.end();
 }
 
-test('bootstrap export with SES', async t => {
-  await bootstrapExport(t, true);
-});
+export default function runTests({
+  requireAbsPath,
+  resolveModule,
+  resolveTestDir,
+}) {
+  test('load empty', async t => {
+    const configRd = {
+      vats: new Map(),
+      bootstrapIndexJSRd: undefined,
+    };
+    const controller = await buildVatControllerRd(configRd, false);
+    await controller.run();
+    t.ok(true);
+    t.end();
+  });
 
-test('bootstrap export without SES', async t => {
-  await bootstrapExport(t, false);
-});
+  test('simple call with SES', async t => {
+    await simpleCall(t, true, resolveModule, requireAbsPath);
+  });
+
+  test('simple call non-SES', async t => {
+    await simpleCall(t, false, resolveModule, requireAbsPath);
+  });
+
+  test('reject module-like sourceIndex', async t => {
+    const vats = new Map();
+    // the keys of 'vats' have a 'sourcepath' property which are vat source
+    // index strings: something that require() or rollup can use to
+    // import/stringify the source graph that should be loaded into the vat. We
+    // want this to be somewhere on local disk, so it should start with '/' or
+    // '.'. If it doesn't, the name will be treated as something to load from
+    // node_modules/ (i.e. something installed from npm), so we want to reject
+    // that.
+    vats.set('vat1', {
+      sourceRd: harden({
+        toString() {
+          return 'vatsource';
+        },
+        isAbsolute() {
+          return false;
+        },
+      }),
+    });
+    t.rejects(
+      async () => buildVatControllerRd({ vats, requireAbsPath }, false),
+      /must be absolute/,
+    );
+    t.end();
+  });
+
+  test('bootstrap with SES', async t => {
+    await bootstrap(t, true, resolveTestDir, requireAbsPath);
+  });
+
+  test('bootstrap without SES', async t => {
+    await bootstrap(t, false, resolveTestDir, requireAbsPath);
+  });
+
+  test('bootstrap export with SES', async t => {
+    await bootstrapExport(t, true, resolveTestDir, requireAbsPath);
+  });
+
+  test('bootstrap export without SES', async t => {
+    await bootstrapExport(t, false, resolveTestDir, requireAbsPath);
+  });
+}
+
+function testAccess(
+  { requireAbsPath, makeRdModule, makeRdDir },
+  { path, dirname, requireResolve },
+) {
+  return harden({
+    requireAbsPath,
+    resolveModule(specifier) {
+      return makeRdModule(requireResolve(specifier));
+    },
+    resolveTestDir(dir) {
+      return makeRdDir(path.resolve(dirname, dir));
+    },
+  });
+}
+
+/** Access ambient authority only if invoked as script. */
+if (typeof require !== 'undefined' && typeof module !== 'undefined') {
+  /* eslint-disable global-require */
+  runTests(
+    testAccess(
+      nodeSourceAccess({
+        requireModule: require,
+        fs: require('fs'),
+        path: require('path'),
+        rollup: require('rollup').rollup,
+        resolvePlugin: require('rollup-plugin-node-resolve'),
+      }),
+      {
+        dirname: __dirname,
+        path: require('path'),
+        requireResolve: require.resolve,
+      },
+    ),
+  );
+}

@@ -1,74 +1,48 @@
-import fs from 'fs';
-import path from 'path';
-import temp from 'temp';
-import { promisify } from 'util';
-import readlines from 'n-readlines';
 // import { createHash } from 'crypto';
 
 // import connect from 'lotion-connect';
 // import harden from '@agoric/harden';
 // import djson from 'deterministic-json';
 
+import Resource from 'Resource';
+
 import {
   loadBasedir,
   buildVatController,
+} from '@agoric/swingset-vat/controller';
+import {
   buildMailboxStateMap,
   buildMailbox,
+} from '@agoric/swingset-vat/devices/mailbox';
+import {
   buildTimer,
-  getVatTPSourcePath,
-  getCommsSourcePath,
-  getTimerWrapperSourcePath,
-} from '@agoric/swingset-vat';
-import { buildStorageInMemory } from '@agoric/swingset-vat/src/hostStorage';
-import buildCommand from '@agoric/swingset-vat/src/devices/command';
+} from '@agoric/swingset-vat/devices/timer';
+
+import { buildStorageInMemory } from '@agoric/swingset-vat/hostStorage';
+import buildCommand from '@agoric/swingset-vat/devices/command';
 
 import { deliver, addDeliveryTarget } from './outbound';
-import { makeHTTPListener } from './web';
+//@@ import { makeHTTPListener } from './web';
 
-import { connectToChain } from './chain-cosmos-sdk';
-import bundle from './bundle';
+//@@ import { connectToChain } from './chain-cosmos-sdk';
+//@@ import bundle from './bundle';
 
 // import { makeChainFollower } from './follower';
 // import { makeDeliverator } from './deliver-with-ag-cosmos-helper';
 
-const CONTRACT_REGEXP = /^((zoe|contractHost)-([^.]+))/;
-
-const fsWrite = promisify(fs.write);
-const fsClose = promisify(fs.close);
-const rename = promisify(fs.rename);
-const unlink = promisify(fs.unlink);
-
-async function atomicReplaceFile(filename, contents) {
-  const info = await new Promise((resolve, reject) => {
-    temp.open(
-      {
-        dir: path.dirname(filename),
-        prefix: `${path.basename(filename)}.`,
-      },
-      (err, inf) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        resolve(inf);
-      },
-    );
-  });
-  try {
-    // Write the contents, close, and rename.
-    await fsWrite(info.fd, contents);
-    await fsClose(info.fd);
-    await rename(info.path, filename);
-  } catch (e) {
-    // Unlink on error.
-    try {
-      await unlink(info.path);
-    } catch (e2) {
-      // do nothing, we're already failing
-    }
-    throw e;
-  }
+function getTimerWrapperSourcePath() {
+  return '@agoric.vat-timerWrapper.js';
 }
+
+function getVatTPSourcePath() {
+  return '@agoric.vattp.js';
+}
+
+function getCommsSourcePath() {
+  return '@agoric.comms.js';
+}
+
+const CONTRACT_REGEXP = /^((zoe|contractHost)-([^.]+))/;
 
 async function buildSwingset(
   mailboxStateFile,
@@ -77,8 +51,9 @@ async function buildSwingset(
   vatsDir,
   argv,
   broadcast,
+  { setInterval, setImmediate, clock }
   ) {
-  const initialMailboxState = JSON.parse(fs.readFileSync(mailboxStateFile));
+  const initialMailboxState = JSON.parse(mailboxStateFile.readFileSync());
 
   const mbs = buildMailboxStateMap();
   mbs.populateFromData(initialMailboxState);
@@ -87,26 +62,35 @@ async function buildSwingset(
   const timer = buildTimer();
 
   const config = await loadBasedir(vatsDir);
+  const mkRd = resName => ({
+    toString: () => resName,
+    async bundleSource() {
+      const rsrc = new Resource(resName);
+      const modSrc = String.fromArrayBuffer(rsrc.slice(0));
+      // console.log('bundleSource got:', resName, modSrc.slice(0, 60) + '...');
+      const expr = `(${modSrc.slice('export default '.length)})`;
+      return { source: expr, sourceMap: null };
+    }
+  });
   config.devices = [
-    ['mailbox', mb.srcPath, mb.endowments],
-    ['command', cm.srcPath, cm.endowments],
-    ['timer', timer.srcPath, timer.endowments],
+    ['mailbox', mkRd(mb.srcPath), mb.endowments],
+    ['command', mkRd(cm.srcPath), cm.endowments],
+    ['timer', mkRd(timer.srcPath), timer.endowments],
   ];
-  config.vats.set('vattp', { sourcepath: getVatTPSourcePath() });
+  config.vats.set('vattp', { sourceRd: mkRd(getVatTPSourcePath()) });
   config.vats.set('comms', {
-    sourcepath: getCommsSourcePath(),
+    sourceRd: mkRd(getCommsSourcePath()),
     options: { enablePipelining: true },
   });
-  config.vats.set('timer', { sourcepath: getTimerWrapperSourcePath() });
+  config.vats.set('timer', { sourceRd: mkRd(getTimerWrapperSourcePath()) });
+  config.setImmediate = setImmediate;
 
   // 'storage' will be modified in-place as the kernel runs
   const storage = buildStorageInMemory();
   config.hostStorage = storage.storage;
 
   // kernelStateFile is created in init-basedir.js, should never be missing
-  const lines = new readlines(kernelStateFile);
-  let line;
-  while ((line = lines.next())) {
+  for (const line of kernelStateFile.readlinesSync()) {
     const [key, value] = JSON.parse(line);
     config.hostStorage.set(key, value);
   }
@@ -115,17 +99,14 @@ async function buildSwingset(
 
   async function saveState() {
     const ms = JSON.stringify(mbs.exportToData());
-    await atomicReplaceFile(mailboxStateFile, ms);
-    const tmpfn = `${kernelStateFile}.tmp`;
-    const fd = fs.openSync(tmpfn, 'w');
-
-    for (let [key, value] of storage.map.entries()) {
-      const line = JSON.stringify([key, value]);
-      fs.writeSync(fd, line);
-      fs.writeSync(fd, '\n');
-    }
-    fs.closeSync(fd);
-    fs.renameSync(tmpfn, kernelStateFile);
+    await mailboxStateFile.atomicReplace(ms);
+    kernelStateFile.withWriting('.tmp', fp => {
+      for (let [key, value] of storage.map.entries()) {
+	const line = JSON.stringify([key, value]);
+	fp.writeSync(line);
+	fp.writeSync('\n');
+      }
+    });
   }
 
   async function processKernel() {
@@ -159,7 +140,7 @@ async function buildSwingset(
   // drop calls to moveTimeForward if it's fallen behind, to make sure we don't
   // have two copies of controller.run() executing at the same time.
   function moveTimeForward() {
-    const now = Math.floor(Date.now() / intervalMillis);
+    const now = Math.floor(clock() / intervalMillis);
     if (timer.poll(now)) {
       const p = processKernel();
       p.then(
@@ -180,11 +161,13 @@ async function buildSwingset(
   };
 }
 
-export default async function start(basedir, withSES, argv) {
-  const mailboxStateFile = path.resolve(basedir, 'swingset-mailbox-state.json');
-  const kernelStateFile = path.resolve(basedir, 'swingset-kernel-state.jsonlines');
+export default async function start(basedir, withSES, argv,
+				    { createServer, setImmediate, setInterval, clock }) {
+  console.log(`@@start(${basedir}, ${withSES}, ${argv})`);
+  const mailboxStateFile = basedir.join('swingset-mailbox-state.json');
+  const kernelStateFile = basedir.join('swingset-kernel-state.jsonlines');
   const connections = JSON.parse(
-    fs.readFileSync(path.join(basedir, 'connections.json')),
+    basedir.join('connections.json').readFileSync(),
   );
   let deliverInboundToMbx;
 
@@ -211,6 +194,7 @@ export default async function start(basedir, withSES, argv) {
     }
   }
 
+  if (false) {
   await Promise.all(
     connections.map(async c => {
       switch (c.type) {
@@ -232,18 +216,22 @@ export default async function start(basedir, withSES, argv) {
           break;
         case 'http':
           console.log(`adding HTTP/WS listener on ${c.host}:${c.port}`);
+  	  console.log('@@http: TODO!'); break;
           if (broadcastJSON) {
             throw new Error(`duplicate type=http in connections.json`);
           }
-          broadcastJSON = makeHTTPListener(basedir, c.port, c.host, command);
+          broadcastJSON = makeHTTPListener(basedir, c.port, c.host, command, { createServer });
           break;
         default:
           throw new Error(`unknown connection type in ${c}`);
       }
     }),
   );
+  } else {
+    console.log('@@http: TODO!');
+  }
 
-  const vatsDir = path.join(basedir, 'vats');
+  const vatsDir = basedir.join('vats');
   const d = await buildSwingset(
     mailboxStateFile,
     kernelStateFile,
@@ -251,22 +239,23 @@ export default async function start(basedir, withSES, argv) {
     vatsDir,
     argv,
     broadcast,
+    { setInterval, setImmediate, clock },
   );
   ({ deliverInboundToMbx, deliverInboundCommand } = d);
 
   console.log(`swingset running`);
 
   // Install the bundles as specified.
-  const initDir = path.join(basedir, 'init-bundles');
+  const initDir = basedir.join('init-bundles');
   let list = [];
   try {
-    list = await fs.promises.readdir(initDir);
+    list = await initDir.readdir();
   } catch (e) {
 
   }
   for (const initName of list.sort()) {
     console.log('loading init bundle', initName);
-    const initFile = path.join(initDir, initName);
+    const initFile = initDir.join(initName);
     if (await bundle(() => '.', ['--evaluate', '--once', '--input', initFile])) {
       return 0;
     }

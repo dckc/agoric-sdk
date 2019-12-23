@@ -6,7 +6,7 @@ export default function buildCommand(broadcastCallback) {
     throw new Error(`broadcastCallback must be provided.`);
   }
   let inboundCallback;
-  const srcPath = require.resolve('./command-src');
+  const srcPath = '@agoric.command-src.js';
   let nextCount = 0;
   const responses = new Map();
 
