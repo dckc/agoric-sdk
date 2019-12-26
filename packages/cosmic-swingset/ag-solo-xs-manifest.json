@@ -1,0 +1,58 @@
+{
+  "include": "$(MODDABLE)/examples/manifest_base.json",
+  "creation": {
+    "keys": {
+      "available": 4096
+    },
+    "stack": 4096
+  },
+  "strip": [],
+  "preload": [
+    "tape-promise/tape"
+  ],
+  "modules": {
+    "main": "./bin/ag-solo-xs",
+    "xs-platform/console": "/home/connolly/projects/agoric/tape-xs/src/console",
+    "@agoric/harden": "/home/connolly/projects/agoric/tape-xs/src/harden-xs",
+    "fs":       "lib/xs-nodejs/fs",
+    "path":     "lib/xs-nodejs/path",
+    "process":  "lib/xs-nodejs/process",
+    "temp":  "lib/xs-nodejs/temp",
+    "util":  "lib/xs-nodejs/util",
+    "minimist": "lib/xs-npm/minimist",
+    "n-readlines": "lib/xs-npm/n-readlines",
+    "ses": "lib/xs-npm/ses",
+    "@agoric/nat": "../../node_modules/@agoric/nat/dist/nat.esm",
+    "@agoric/marshal": "../marshal/marshal",
+    "@agoric/eventual-send": "../eventual-send/dist/eventual-send.esm",
+    "@agoric/swingset-vat": "../SwingSet/src/index",
+    "@agoric/default-evaluate-options": "./lib/xs-npm/default-evaluate-options",
+    "@agoric/bundle-source": "./lib/xs-npm/bundle-source",
+
+    "@agoric/controller": "../SwingSet/src/controller",
+    "@agoric/kernel/*": "../SwingSet/src/kernel/*",
+    "@agoric/devices/*": "../SwingSet/src/devices/*",
+    "@agoric/vats/*": "../SwingSet/src/vats/*",
+    "@agoric/vats/comms/*": "../SwingSet/src/vats/comms/*",
+    "@agoric/bundles/kernel": "./lib/bundles/kernel",
+    "@agoric/insist": "../SwingSet/src/insist",
+    "@agoric/parseVatSlots": "../SwingSet/src/parseVatSlots",
+    "@agoric/capdata": "../SwingSet/src/capdata",
+    "@agoric/makePromise": "../SwingSet/src/makePromise",
+    "@agoric/message": "../SwingSet/src/message",
+    "@agoric/kernel/state/*": "../SwingSet/src/kernel/state/*",
+    "@agoric/storageAPI": "../SwingSet/src/storageAPI",
+    "@agoric/hostStorage": "../SwingSet/src/hostStorage",
+
+    "./lib/_DIRECTORY_MARKER":    "./lib/ag-solo/_DIRECTORY_MARKER",
+    "./lib/ag-solo/insist":       "./lib/ag-solo/insist",
+    "./lib/ag-solo/start":       "./lib/ag-solo/start",
+    "./lib/ag-solo/outbound":       "./lib/ag-solo-todo/outbound",
+    "./lib/ag-solo/web":       "./lib/ag-solo-todo/web",
+    "./lib/ag-solo/chain-cosmos-sdk":    "./lib/ag-solo-todo/chain-cosmos-sdk",
+    "./lib/ag-solo/bundle":       "./lib/ag-solo-todo/bundle",
+    "./lib/ag-solo/init-basedir": "./lib/ag-solo-todo/init-basedir",
+    "./lib/ag-solo/set-gci-ingress": "./lib/ag-solo-todo/set-gci-ingress",
+    "./lib/ag-solo/main":         "./lib/ag-solo/main"
+  }
+}
