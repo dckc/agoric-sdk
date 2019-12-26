@@ -1,0 +1,1 @@
+../../../SwingSet/src/bundles/kernel
