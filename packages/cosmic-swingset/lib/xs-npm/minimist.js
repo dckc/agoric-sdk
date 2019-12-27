@@ -1,4 +1,4 @@
-module.exports = function (args, opts) {
+export default function (args, opts) {
     if (!opts) opts = {};
     
     var flags = { bools : {}, strings : {}, unknownFn: null };
