@@ -1,1 +1,4 @@
-'todo';
+export function connectToChain() {
+  throw('todo');
+}
+
