@@ -12,14 +12,18 @@
     "tape-promise/tape"
   ],
   "modules": {
+    "file": [
+      "$(MODULES)/files/file/*",
+      "$(MODULES)/files/file/lin/*",
+    ],
     "main": "./bin/ag-solo-xs",
     "xs-platform/console": "lib/xs-nodejs/console",
     "@agoric/harden": "lib/xs-nodejs/harden-xs",
     "fs":       "lib/xs-nodejs/fs",
+    "pathlib":  "lib/xs-nodejs/pathlib",
     "path":     "lib/xs-nodejs/path",
     "process":  "lib/xs-nodejs/process",
     "temp":  "lib/xs-nodejs/temp",
-    "util":  "lib/xs-nodejs/util",
     "minimist": "lib/xs-npm/minimist",
     "n-readlines": "lib/xs-npm/n-readlines",
     "ses": "lib/xs-npm/ses",
