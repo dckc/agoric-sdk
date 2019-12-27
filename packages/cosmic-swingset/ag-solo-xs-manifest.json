@@ -12,8 +12,8 @@
   ],
   "modules": {
     "main": "./bin/ag-solo-xs",
-    "xs-platform/console": "/home/connolly/projects/agoric/tape-xs/src/console",
-    "@agoric/harden": "/home/connolly/projects/agoric/tape-xs/src/harden-xs",
+    "xs-platform/console": "lib/xs-nodejs/console",
+    "@agoric/harden": "lib/xs-nodejs/harden-xs",
     "fs":       "lib/xs-nodejs/fs",
     "path":     "lib/xs-nodejs/path",
     "process":  "lib/xs-nodejs/process",
