@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import temp from 'temp';
-import { promisify } from 'util';
 import readlines from 'n-readlines';
 // import { createHash } from 'crypto';
 
@@ -33,10 +32,7 @@ import bundle from './bundle';
 
 const CONTRACT_REGEXP = /^((zoe|contractHost)-([^.]+))/;
 
-const fsWrite = promisify(fs.write);
-const fsClose = promisify(fs.close);
-const rename = promisify(fs.rename);
-const unlink = promisify(fs.unlink);
+const { write: fsWrite, close: fsClose, rename, unlink } = fs.promises;
 
 async function atomicReplaceFile(filename, contents) {
   const info = await new Promise((resolve, reject) => {
