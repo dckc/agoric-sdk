@@ -9,5 +9,10 @@ export default async function main() {
   const console = makeConsole();
   console.log(`in bin/ag-solo-xs...`);
 
-  solo();
+  try {
+    await solo('ag-solo-xs', ['start']);
+  } catch (oops) {
+    console.error(oops);
+    console.error(oops.message);
+  }
 }
