@@ -8,6 +8,7 @@
   },
   "strip": [],
   "preload": [
+    "console",
     "tape-promise/tape"
   ],
   "modules": {

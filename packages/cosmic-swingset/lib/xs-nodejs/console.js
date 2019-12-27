@@ -1,5 +1,5 @@
 /** console for xs platform */
-/* global trace */
+/* global trace, globalThis */
 const harden = x => Object.freeze(x, true);
 
 const text = it => typeof it == 'object' ? JSON.stringify(it) : `${it}`;
@@ -21,3 +21,5 @@ export function makeConsole(write_) {
     },
   });
 }
+
+globalThis.console = makeConsole();
