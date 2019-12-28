@@ -1,2 +1,7 @@
-export const todo = Object.freeze({});
-export default todo;
+import harden from '@agoric/harden';
+
+export default function makeDefaultEvaluateOptions() {
+  return harden({
+    transforms: [],
+  });
+}
