@@ -9,6 +9,7 @@
   "strip": [],
   "preload": [
     "xs-platform/console",
+    "require-xs",
     "timer-ticks",
     "tape-promise/tape"
   ],
@@ -25,6 +26,7 @@
     "pathlib":  "lib/xs-nodejs/pathlib",
     "path":     "lib/xs-nodejs/path",
     "process":  "lib/xs-nodejs/process",
+    "require-xs":  "lib/xs-nodejs/require-xs",
     "temp":  "lib/xs-nodejs/temp",
     "minimist": "lib/xs-npm/minimist",
     "n-readlines": "lib/xs-npm/n-readlines",
