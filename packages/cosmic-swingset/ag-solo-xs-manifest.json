@@ -43,7 +43,7 @@
     "@agoric/devices/*": "../SwingSet/src/devices/*",
     "@agoric/vats/*": "../SwingSet/src/vats/*",
     "@agoric/vats/comms/*": "../SwingSet/src/vats/comms/*",
-    "@agoric/bundles/kernel": "./lib/bundles/kernel",
+    "@agoric/bundles/kernel": "../SwingSet/src/kernel-resource",
     "@agoric/insist": "../SwingSet/src/insist",
     "@agoric/parseVatSlots": "../SwingSet/src/parseVatSlots",
     "@agoric/capdata": "../SwingSet/src/capdata",
@@ -63,5 +63,9 @@
     "./lib/ag-solo/init-basedir": "./lib/ag-solo-todo/init-basedir",
     "./lib/ag-solo/set-gci-ingress": "./lib/ag-solo-todo/set-gci-ingress",
     "./lib/ag-solo/main":         "./lib/ag-solo/main"
+  },
+
+  "data": {
+    "agoric.kernel.js": "../SwingSet/src/bundles/kernel"
   }
 }
