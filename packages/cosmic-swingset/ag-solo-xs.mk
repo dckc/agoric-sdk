@@ -6,7 +6,7 @@ PKG=cosmic-swingset
 BASEDIR=t3
 
 check-imports: $(MODDABLE)/build/bin/lin/release/cosmic-swingset
-	$(MODDABLE)/build/bin/lin/release/cosmic-swingset $(BASEDIR)
+	cd $(BASEDIR) && $(MODDABLE)/build/bin/lin/release/cosmic-swingset start
 
 $(MODDABLE)/build/bin/lin/release/cosmic-swingset: ./bin/ag-solo-xs.js lib/ag-solo/*.js lib/xs-npm/*.js lib/xs-nodejs/*.js lib/ag-solo-todo/*.js
 	mcconfig -m -p x-cli-lin ag-solo-xs-manifest.json

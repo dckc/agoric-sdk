@@ -14,7 +14,7 @@
   "modules": {
     "file": [
       "$(MODULES)/files/file/*",
-      "$(MODULES)/files/file/lin/*",
+      "$(MODULES)/files/file/lin/*"
     ],
     "main": "./bin/ag-solo-xs",
     "xs-platform/console": "lib/xs-nodejs/console",

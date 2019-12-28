@@ -13,4 +13,8 @@ export function resolve(base, ...others) {
   return `${p.resolve(...others)}`;
 }
 
-export default { join, resolve };
+export function isAbsolute(path) {
+  return path.startsWith('/');
+}
+
+export default harden({ join, resolve, isAbsolute });

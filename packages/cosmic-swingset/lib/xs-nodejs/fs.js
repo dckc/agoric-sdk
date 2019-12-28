@@ -9,6 +9,11 @@ function readFileSync(path) {
   return p.readFileSync();
 }
 
+function readdirSync(path) {
+  const p = makePath(path, { File, Iterator });
+  return p.readdirSync();
+}
+
 function statSync(path) {
   const p = makePath(path, { File, Iterator });
   return p.statSync();
@@ -26,4 +31,4 @@ export function realpathSync(path) {
   return path;
 }
 
-export default { realpathSync, promises, readFileSync, statSync };
+export default { realpathSync, promises, readFileSync, readdirSync, statSync };
