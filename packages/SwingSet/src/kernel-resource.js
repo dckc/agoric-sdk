@@ -1,7 +1,7 @@
-/* global Resource */
 import harden from '@agoric/harden';
 
-import Resource from "Resource";
+// eslint-disable-next-line import/no-unresolved
+import Resource from 'Resource';
 
 /**
  * In the original node.js approach, the bundles/kernel module exports
@@ -13,7 +13,7 @@ import Resource from "Resource";
  */
 export default harden({
   toString() {
-    const kernelROM = new Resource("agoric.kernel.js");
+    const kernelROM = new Resource('agoric.kernel.js');
     const kernelModText = String.fromArrayBuffer(kernelROM.slice(0));
     const kernelExpr = kernelModText.slice('export default '.length);
     return kernelExpr;
