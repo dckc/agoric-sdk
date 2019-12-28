@@ -1,3 +1,6 @@
 export function makeHTTPListener() {
-  throw('todo');
+  console.warn('makeHTTPListener on xs is TODO');
+  function sendJSON(obj) {
+  }
+  return sendJSON;
 }
