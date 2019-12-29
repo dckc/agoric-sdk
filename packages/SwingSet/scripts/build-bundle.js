@@ -1,27 +1,7 @@
+/* eslint-disable no-await-in-loop */
 import bundleSource from '@agoric/bundle-source';
 
 async function main(argv, pkg, { open, rollup, resolvePlugin, pathResolve }) {
-  if (argv.includes('--vats')) {
-    for (const src of argv.slice(3)) {
-      const dest = src.replace(/vat-([^\.]+).js$/, 'vat_$1-src.js');
-      await bundle1(src, dest);
-    }
-  } else if (argv.length < 4) {
-    for (const dev of ['mailbox', 'command', 'timer']) {
-      const [startFilename, dest] = [`${pkg}/src/devices/${dev}-src.js`, `${pkg}/src/bundles/${dev}-src.js`];
-      await bundle1(startFilename, dest);
-    }
-    for (const [vat, src] of [['vattp', 'vat-tp'],
-			       ['comms', 'comms/index'],
-			       ['timer', 'vat-timerWrapper']]) {
-      const [startFilename, dest] = [`${pkg}/src/vats/${src}.js`, `${pkg}/src/bundles/vat_${vat}-src.js`];
-      await bundle1(startFilename, dest);
-    }
-  } else {
-    const [startFilename, dest] = argv.slice(2, 4);
-    await bundle1(startFilename, dest);
-  }
-
   async function bundle1(startFilename, dest) {
     console.log(`bundle: ${startFilename} -> ${dest}`);
     const { source, sourceMap } = await bundleSource(
@@ -35,10 +15,38 @@ async function main(argv, pkg, { open, rollup, resolvePlugin, pathResolve }) {
     await f.close();
   }
 
+  if (argv.includes('--vats')) {
+    for (const src of argv.slice(3)) {
+      const dest = src.replace(/vat-([^.]+).js$/, 'vat_$1-src.js');
+      await bundle1(src, dest);
+    }
+  } else if (argv.length < 4) {
+    for (const dev of ['mailbox', 'command', 'timer']) {
+      const [startFilename, dest] = [
+        `${pkg}/src/devices/${dev}-src.js`,
+        `${pkg}/src/bundles/${dev}-src.js`,
+      ];
+      await bundle1(startFilename, dest);
+    }
+    for (const [vat, src] of [
+      ['vattp', 'vat-tp'],
+      ['comms', 'comms/index'],
+      ['timer', 'vat-timerWrapper'],
+    ]) {
+      const [startFilename, dest] = [
+        `${pkg}/src/vats/${src}.js`,
+        `${pkg}/src/bundles/vat_${vat}-src.js`,
+      ];
+      await bundle1(startFilename, dest);
+    }
+  } else {
+    const [startFilename, dest] = argv.slice(2, 4);
+    await bundle1(startFilename, dest);
+  }
 }
 
-
 /** Access ambient authority only if invoked as script. */
+/* eslint-disable global-require */
 if (typeof require !== 'undefined' && typeof module !== 'undefined') {
   main(process.argv, `${__dirname}/..`, {
     open: require('fs').promises.open,
@@ -54,4 +62,3 @@ if (typeof require !== 'undefined' && typeof module !== 'undefined') {
     },
   );
 }
-
