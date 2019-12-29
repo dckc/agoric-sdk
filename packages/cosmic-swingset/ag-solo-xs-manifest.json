@@ -56,7 +56,7 @@
     "./lib/_DIRECTORY_MARKER":    "./lib/ag-solo/_DIRECTORY_MARKER",
     "./lib/ag-solo/insist":       "./lib/ag-solo/insist",
     "./lib/ag-solo/start":       "./lib/ag-solo/start",
-    "./lib/ag-solo/outbound":       "./lib/ag-solo-todo/outbound",
+    "./lib/ag-solo/outbound":       "./lib/ag-solo/outbound",
     "./lib/ag-solo/web":       "./lib/ag-solo-todo/web",
     "./lib/ag-solo/chain-cosmos-sdk":    "./lib/ag-solo-todo/chain-cosmos-sdk",
     "./lib/ag-solo/bundle":       "./lib/ag-solo-todo/bundle",
