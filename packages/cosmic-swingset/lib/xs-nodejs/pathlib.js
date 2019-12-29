@@ -1,5 +1,38 @@
 const harden = x => Object.freeze(x, true);
 
+export function normalize(path) {
+  // multiple //s -> /
+  path = path.replace(/\/\/+/g, '/');
+  // /./ -> /
+  path = path.replace(/\/\.\//g, '/');
+  // segment/.. -> X
+  path = path.replace(/[^\/]+\/\.\.\b/g, '');
+  return path;
+}
+
+export function resolve(...paths) {
+  let path = null;
+  // "The given sequence of paths is processed from right to left ..."
+  for (const segment of [...paths].reverse()) {
+    if (path === null) {
+      path = segment;
+    } else {
+      path = segment + '/' + path;
+    }
+    if (path.startsWith('/')) {
+      return normalize(path);
+    }
+  }
+  // "If after processing all given path segments an absolute path
+  // has not yet been generated, the current working directory is
+  // used."
+  return normalize('./' + path);
+}
+
+export function join(...paths) {
+  return normalize(paths.join('/'));
+}
+
 export function makePath(filename, { File, Iterator }) {
   const mk = there => makePath(there, { File, Iterator });
 
@@ -109,14 +142,8 @@ export function makePath(filename, { File, Iterator }) {
     toString() {
       return filename;
     },
-    resolve(...others) {
-      // ISSUE: support ../?
-      return mk([butLast(filename), ...others].join('/'));
-    },
-    join(...others) {
-      // ISSUE: support ../?
-      return mk([filename, ...others].join('/'));
-    },
+    resolve(...others) { return mk(resolve(filename, ...others)); },
+    join(...others) { return mk(join(filename, ...others)); },
     statSync() {
       new File(filename);
       return harden({});

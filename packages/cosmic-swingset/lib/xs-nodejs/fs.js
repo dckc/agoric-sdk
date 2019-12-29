@@ -19,16 +19,104 @@ function statSync(path) {
   return p.statSync();
 }
 
-const promises = harden({
-  write() { throw('todo'); },
-  close() { throw('todo'); },
-  rename() { throw('todo'); },
-  unlink() { throw('todo'); },
-});
-
 export function realpathSync(path) {
   console.warn('realpathSync() is a noop on xs (TODO)');
   return path;
 }
 
-export default { realpathSync, promises, readFileSync, readdirSync, statSync };
+// BLECH global mutable state
+const openFiles = (() => {
+  const files = [];
+
+  function lookup(fd) {
+    const fp = files[fd];
+    if (!fp) {
+      throw new Error(`bad file descriptor: ${fd}`);
+    }
+    return fp;
+  }
+
+  return harden({
+    lookup,
+    add(path, write) {
+      const fd = files.length;
+      const fp = new File(path, write);
+      files.push(fp);
+      console.log(`@@new fd: ${fd} -> ${path}`);
+      return fd;
+    },
+    close(fd) {
+      const fp = lookup(fd);
+      console.log(`@@closing fd: ${fd}`);
+      fp.close();
+    },
+  });
+})();
+
+
+function later(thunk) {
+  Promise.resolve(null).then(thunk);
+}
+
+const promises = harden({
+  write(fd, text) {
+    later(() => { openFiles.lookup(fd).write(text); });
+  },
+  close(fd) {
+    later(() => openFiles.close(fd));
+  },
+  readdir(path) {
+    return makePath(path, { File, Iterator }).readdir();
+  },
+  rename(from, to) {
+    later(() => File.rename(from, to));
+  },
+  unlink(path) {
+    later(() => File.delete(path));
+  },
+});
+
+export function openSync(path, mode = 'r') {
+  let fp;
+  if (mode === 'r') {
+    return openFiles.add(path);
+  }
+  if (mode === 'w') {
+    return openFiles.add(path, true);
+  }
+  if (mode === 'wx') {
+    try {
+      const probe = new File(path);
+      probe.close();
+      throw new Error('already exists');
+    } catch (_doesNotExist) {
+      // ok
+    }
+    return openFiles.add(path, true);
+  }
+  throw new Error(`open mode invalid or not implemented: ${mode}`);
+}
+
+export function writeSync(fd, text) {
+  openFiles.lookup(fd).write(text);
+}
+
+export function closeSync(fd) {
+  openFiles.close(fd);
+}
+
+export function renameSync(from, to) {
+  File.rename(from, to);
+}
+
+export default {
+  closeSync,
+  openSync,
+  promises,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  renameSync,
+  statSync,
+  writeSync,
+};
