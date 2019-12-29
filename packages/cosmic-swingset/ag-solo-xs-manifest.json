@@ -66,6 +66,12 @@
   },
 
   "data": {
-    "agoric.kernel.js": "../SwingSet/src/bundles/kernel"
+    "agoric.kernel.js": "../SwingSet/src/bundles/kernel",
+    "@agoric.mailbox-src": "../SwingSet/src/bundles/mailbox-src",
+    "@agoric.command-src": "../SwingSet/src/bundles/command-src",
+    "@agoric.timer-src": "../SwingSet/src/bundles/timer-src",
+    "@agoric.comms": "../SwingSet/src/bundles/vat_comms-src",
+    "@agoric.vattp": "../SwingSet/src/bundles/vat_vattp-src",
+    "@agoric.vat-timerWrapper": "../SwingSet/src/bundles/vat_timer-src"
   }
 }

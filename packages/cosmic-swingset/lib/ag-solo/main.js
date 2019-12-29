@@ -22,7 +22,7 @@ function insistIsBasedir() {
   if (AG_SOLO_BASEDIR) {
     process.chdir(AG_SOLO_BASEDIR);
   }
-  const basedir = fs.realpathSync('.');
+  const basedir = './t3/'; //@@KLUDGE fs.realpathSync('.');
   try {
     fs.statSync(path.join(basedir, 'solo-README.md'));
   } catch (e) {
