@@ -12,7 +12,7 @@ $(MODDABLE)/build/bin/lin/release/cosmic-swingset: ./bin/ag-solo-xs.js lib/ag-so
 	mcconfig -m -p x-cli-lin ag-solo-xs-manifest.json
 
 # run in simulator and xsbug
-debug-lite:
+debug-lite: ../SwingSet/src/bundles/mailbox-src.js t3/vats/bootstrap-src.js
 	mcconfig -d -p lin -m ag-solo-xs-manifest.json
 
 force-build:
