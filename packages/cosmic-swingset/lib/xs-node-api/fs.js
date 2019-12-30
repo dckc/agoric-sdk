@@ -4,6 +4,10 @@ import { makePath } from './pathlib';
 
 import { File, Iterator } from 'file';  // beware: powerful!
 
+export function makePathAccess(path) {  // ISSUE: beyond node fs API
+  return makePath(path, { File, Iterator });
+}
+
 function readFileSync(path) {
   const p = makePath(path, { File, Iterator });
   return p.readFileSync();
