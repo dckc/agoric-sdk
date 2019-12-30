@@ -138,16 +138,28 @@ export function makePath(filename, { File, Iterator }) {
     };
   }
 
+  function statSync() {
+    new File(filename);
+    return harden({});
+  }
+
+  function exists() {
+    try {
+      statSync();
+    } catch(_doesNotExist) {
+      return false;
+    }
+    return true;
+  }
+
   return harden({
     toString() {
       return filename;
     },
     resolve(...others) { return mk(resolve(filename, ...others)); },
     join(...others) { return mk(join(filename, ...others)); },
-    statSync() {
-      new File(filename);
-      return harden({});
-    },
+    exists,
+    statSync,
     readFileSync,
     readlinesSync() {
       const text = readFileSync();

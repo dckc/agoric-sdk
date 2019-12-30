@@ -8,9 +8,9 @@
   },
   "strip": [],
   "preload": [
-    "xs-platform/console",
-    "require-xs",
-    "timer-ticks",
+    "xs-node-global/console",
+    "xs-node-global/require-xs",
+    "xs-node-global/timer-ticks",
     "tape-promise/tape"
   ],
   "modules": {
@@ -19,17 +19,13 @@
       "$(MODULES)/files/file/lin/*"
     ],
     "main": "./bin/ag-solo-xs",
-    "xs-platform/console": "lib/xs-nodejs/console",
-    "timer-ticks":  "lib/xs-nodejs/timer-ticks",
-    "fs":       "lib/xs-nodejs/fs",
-    "pathlib":  "lib/xs-nodejs/pathlib",
-    "path":     "lib/xs-nodejs/path",
-    "process":  "lib/xs-nodejs/process",
-    "require-xs":  "lib/xs-nodejs/require-xs",
-    "temp":  "lib/xs-nodejs/temp",
-    "minimist": "lib/xs-npm/minimist",
-    "n-readlines": "lib/xs-npm/n-readlines",
-    "ses": "lib/xs-npm/ses",
+    "*":  [
+      "lib/xs-node-api/*",
+      "lib/xs-npm/*"
+    ],
+
+    "xs-node-global/*": "lib/xs-node-global/*",
+
     "@agoric/harden": "lib/xs-agoric/harden-xs",
     "@agoric/default-evaluate-options": "./lib/xs-agoric/default-evaluate-options",
     "@agoric/bundle-source": "./lib/xs-agoric/bundle-source",
