@@ -18,6 +18,12 @@
       "$(MODULES)/files/file/*",
       "$(MODULES)/files/file/lin/*"
     ],
+    "xs-net/http": "$(MODULES)/network/http/http",
+    "socket": [
+      "$(MODULES)/network/socket/*",
+      "$(MODULES)/network/socket/lin/*"
+    ],
+
     "main": "./bin/ag-solo-xs",
     "*":  [
       "lib/xs-node-api/*",
@@ -33,8 +39,8 @@
     "@agoric/nat": "../../node_modules/@agoric/nat/dist/nat.esm",
     "@agoric/marshal": "../marshal/marshal",
     "@agoric/eventual-send": "../eventual-send/dist/eventual-send.esm",
-    "@agoric/swingset-vat": "../SwingSet/src/index",
 
+    "@agoric/swingset-vat": "../SwingSet/src/index",
     "@agoric/controller": "../SwingSet/src/controller",
     "@agoric/kernel/*": "../SwingSet/src/kernel/*",
     "@agoric/devices/*": "../SwingSet/src/devices/*",
@@ -54,7 +60,7 @@
     "./lib/ag-solo/insist":       "./lib/ag-solo/insist",
     "./lib/ag-solo/start":       "./lib/ag-solo/start",
     "./lib/ag-solo/outbound":       "./lib/ag-solo/outbound",
-    "./lib/ag-solo/web":       "./lib/ag-solo-todo/web",
+    "./lib/ag-solo/web":       "./lib/ag-solo/web",
     "./lib/ag-solo/chain-cosmos-sdk":    "./lib/ag-solo-todo/chain-cosmos-sdk",
     "./lib/ag-solo/bundle":       "./lib/ag-solo-todo/bundle",
     "./lib/ag-solo/init-basedir": "./lib/ag-solo-todo/init-basedir",
