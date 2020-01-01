@@ -8,9 +8,7 @@
   },
   "strip": [],
   "preload": [
-    "xs-node-global/console",
-    "xs-node-global/require-xs",
-    "xs-node-global/timer-ticks",
+    "xs-node-global/*",
     "tape-promise/tape"
   ],
   "modules": {

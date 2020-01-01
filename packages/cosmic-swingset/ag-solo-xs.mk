@@ -8,7 +8,7 @@ BASEDIR=t3
 check-start: $(MODDABLE)/build/bin/lin/release/cosmic-swingset ../SwingSet/src/bundles/mailbox-src.js t3/vats/bootstrap-src.js
 	cd $(BASEDIR) && $(MODDABLE)/build/bin/lin/release/cosmic-swingset start --role=three_client
 
-$(MODDABLE)/build/bin/lin/release/cosmic-swingset: ./bin/ag-solo-xs.js lib/ag-solo/*.js lib/xs-npm/*.js lib/xs-nodejs/*.js lib/ag-solo-todo/*.js
+$(MODDABLE)/build/bin/lin/release/cosmic-swingset: ./bin/ag-solo-xs.js lib/ag-solo/*.js lib/xs-npm/*.js lib/xs-node-global/*.js lib/xs-node-api/*.js lib/ag-solo-todo/*.js
 	mcconfig -m -p x-cli-lin ag-solo-xs-manifest.json
 
 # run in simulator and xsbug
