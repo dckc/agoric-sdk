@@ -17,6 +17,9 @@
       "$(MODULES)/files/file/lin/*"
     ],
     "xs-net/http": "$(MODULES)/network/http/http",
+    "xs-net/websocket": [
+      "$(MODULES)/network/websocket/websocket"
+    ],
     "socket": [
       "$(MODULES)/network/socket/*",
       "$(MODULES)/network/socket/lin/*"
@@ -25,7 +28,11 @@
     "main": "./bin/ag-solo-xs",
     "*":  [
       "lib/xs-node-api/*",
-      "lib/xs-npm/*"
+      "lib/xs-npm/*",
+      "$(MODULES)/data/base64/*",
+      "$(MODULES)/data/logical/*",
+      "$(MODULES)/crypt/digest/*",
+      "$(MODULES)/crypt/digest/kcl/*"
     ],
 
     "xs-node-global/*": "lib/xs-node-global/*",
