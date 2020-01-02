@@ -3,7 +3,7 @@
 import harden from '@agoric/harden';
 import Nat from '@agoric/nat';
 
-const DEBUG_FLAG = true;
+const DEBUG_FLAG = false;
 const DEBUG = (...args) => { if (DEBUG_FLAG) { console.log('===ses:', args); } };
 
 

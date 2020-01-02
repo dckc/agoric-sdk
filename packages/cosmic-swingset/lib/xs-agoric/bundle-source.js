@@ -19,7 +19,7 @@ function butLast(p) {
 }
 
 export default function bundleSource(path) {
-  console.log('@@bundle-source:', path);
+  // console.log('bundle-source:', path);
   let vatModText;
   const resName = genesisVats[path];
   if (resName) {
@@ -35,7 +35,7 @@ export default function bundleSource(path) {
     } else {
       throw new Error(`expected vat-NAME.js; got: ${path}`);
     }
-    console.log(`@@bundleSource ${path} -> ${bundlePath}`);
+    console.log(`=== bundleSource ${path} -> ${bundlePath}`);
     vatModText = fs.readFileSync(bundlePath);
   }
 
