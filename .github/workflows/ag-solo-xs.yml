@@ -18,10 +18,10 @@ jobs:
       run: yarn install
     - name: yarn build
       run: yarn build
-    - name: install moddable linux CLI SDK ag08
+    - name: install moddable linux CLI SDK v0.1.12-ag
       run: |
         cd $HOME
-        curl -L https://github.com/dckc/moddable/releases/download/ag08/moddable-linux-sdk.tgz | tar xzf -
+        curl -L https://github.com/dckc/moddable/releases/download/v0.1.12-ag/moddable-linux-sdk.tgz | tar xzf -
     - name: install tape-xs
       # ISSUE: merge into agoric-sdk?
       run: |
