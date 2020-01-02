@@ -130,7 +130,7 @@ export function makePath(filename, { File, Iterator }) {
     } else {
       throw new Error(`expected vat-NAME.js; got: ${filename}`);
     }
-    console.log(`@@bundleSource ${filename} -> ${bundlePath}`);
+    console.warn(`bundleSource ${filename} -> ${bundlePath}`);
     const src = mk(bundlePath).readFileSync();
     return {
       source: src.replace(/^export default /, ''),
