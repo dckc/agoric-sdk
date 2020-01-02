@@ -46,12 +46,12 @@ const openFiles = (() => {
       const fd = files.length;
       const fp = new File(path, write);
       files.push(fp);
-      console.log(`@@new fd: ${fd} -> ${path}`);
+      // console.log(`new fd: ${fd} -> ${path}`);
       return fd;
     },
     close(fd) {
       const fp = lookup(fd);
-      console.log(`@@closing fd: ${fd}`);
+      // console.log(`closing fd: ${fd}`);
       fp.close();
     },
   });
