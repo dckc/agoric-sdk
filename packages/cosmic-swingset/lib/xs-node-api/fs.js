@@ -1,6 +1,7 @@
 import harden from '@agoric/harden';
 
-import { makePath } from './pathlib';
+import { makePath, resolve } from './pathlib';
+import process from './process';
 
 import { File, Iterator } from 'file';  // beware: powerful!
 
@@ -24,8 +25,8 @@ function statSync(path) {
 }
 
 export function realpathSync(path) {
-  console.warn('realpathSync() is a noop on xs (TODO)');
-  return path;
+  console.warn('XS: realpathSync() is a stub (TODO)');
+  return resolve(`${process.cwd()}/`, path);
 }
 
 // BLECH global mutable state
