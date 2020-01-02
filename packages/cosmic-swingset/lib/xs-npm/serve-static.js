@@ -18,7 +18,12 @@ function makeServeStatic(files) {
   const index = files.resolve('index.html');
 
   return function staticHandler(req, res, next) {
-    console.log('@@express.static', req.path);
+    console.log('@@express.static', req.method, req.path);
+
+    if (req.method !== 'GET') {
+      next();
+      return;
+    }
 
     let file;
     if (req.path === '/' && index.exists()) {
@@ -28,12 +33,12 @@ function makeServeStatic(files) {
       try {
 	file = resolveDown(files, req.path.slice(1));
       } catch(_noPermission) {
-	res.status(403).send(`not authorized: ${req.path}`);
-	return next();
+	next({ status: 403, message: `not authorized: ${req.path}` });
+	return;
       }
       if (!file.exists()) {
-	res.status(404).send(`not found: ${req.path}`);
-	return next();
+	next({ status: 404, message: `not found: ${req.path}` });
+	return;
       }
     }
     const body = file.readFileSync();
@@ -44,7 +49,7 @@ function makeServeStatic(files) {
       }
     }
     res.send(body);
-    return next();
+    next();
   };
 }
 

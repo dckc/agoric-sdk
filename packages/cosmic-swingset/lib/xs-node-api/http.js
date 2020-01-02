@@ -11,16 +11,16 @@ function makeEmitter() {
   return harden({
     on(name, handler) {
       if (name in byName) {
-	byName[name].push(handler);
+        byName[name].push(handler);
       } else {
-	byName[name] = [handler];
+        byName[name] = [handler];
       }
     },
     emit(name, ...args) {
       const handlers = byName[name];
       if (!handlers) { return; }
       for (const handler of handlers) {
-	later(() => handler(...args));
+        later(() => handler(...args));
       }
     }
   });
@@ -30,89 +30,139 @@ export function createServer(handler) {
   let server;
   const events = makeEmitter();
 
+  function forNode(socket) {
+    const peer = socket.get('REMOTE_IP').split(':');
+    const [host, port] = peer;
+    // socket.state has to stay mutable, so we can't harden this.
+    // We don't rely on this structure after handling it
+    // to the event handler, though.
+    return {
+      remoteAddress: host,
+      remotePort: port,
+      _xs_socket: socket,
+    };
+  }
+
+  function checkUpgrade(req) {
+    let upgrade = false;
+    const tokens = txt => txt.split(',').map(tok => tok.trim().toLowerCase());
+
+    console.log('@@http shim got request head:', JSON.stringify({
+      req,
+      hasUpgrade: 'upgrade' in req.headers,
+      hasConnection: 'connection' in req.headers,
+      connectionUpgrade: tokens(req.headers['connection']).includes('upgrade'),
+    }, null, 2));
+
+    if ('upgrade' in req.headers &&
+        'connection' in req.headers &&
+        tokens(req.headers['connection']).includes('upgrade')) {
+      upgrade = true;
+      const nodeReq = {
+        headers: req.headers,
+        url: req.path,
+        socket: req.socket,
+      };
+      const bodyHead = '';  // ISSUE: data pending in socket?
+      console.log('@@emit upgrade');
+      events.emit('upgrade', nodeReq, req.socket, bodyHead);
+    }
+    return upgrade;
+  }
+
   function listen(port, host, listening) {
     server = new Server({ host, port });
+
     server.callback = function(message, val1, val2) {
-       // ISSUE: xs http API uses `this`
-      if (!this.request) {
-	this.request = {};
-	this.buf = { content: '', pos: 0 };
+      // ISSUE: xs http API uses `this` for Request
+      if (!this._req) {
+        this._req = { headers: {}, upgrade: false, body: null };
+        this.buf = { content: '', pos: 0 };
       }
-      const { request: req, buf, socket } = this;
+      const { _req: req, buf, socket } = this;
       switch (message) {
-      case 2:
-	req.status = 200;
-	req.path = val1;
-	req.method = val2;
-	req.headers = {};
-	req.upgrade = false;
-	break;
-      case 3:
-	req.headers[val1] = val2;
-	break;
-      case 4:
-	console.log('@@http shim got request head:', req);
-	if (req.headers['upgrade'] === 'websocket') {
-	  const peer = socket.get('REMOTE_IP').split(':');
-	  const [host, port] = peer;
-	  // socket.state has to stay mutable, so we can't harden nodeSocket
-	  // We don't rely on this structure after handling it
-	  // to the event handler, though.
-	  const nodeSocket = {
-	    remoteAddress: host,
-	    remotePort: port,
-	    _xs_socket: socket,
-	  };
-	  const nodeReq = {
-	    headers: req.headers,
-	    url: req.path,
-	    socket: nodeSocket,
-	  };
-	  const bodyHead = '';
-	  events.emit('upgrade', nodeReq, nodeSocket, bodyHead);
-	  req.upgrade = true;
-	}
-	break;
-      case 8:
-	if (req.upgrade) { return undefined; }  // don't reply
-	harden(req);
-	let byName = {'content-type': 'text/plain'};
-	const resp = harden({
-	  status(code) {
-	    req.status = code;
-	    return resp;
-	  },
-	  set(name, value) {
-	    byName[name.toLowerCase()] = value;
-	    return resp;
-	  },
-	  send(content) {
-	    buf.content = content;
-	    return resp;
-	  },
-	});
-	console.log('@@http shim calling handler with:', req);
-	handler(req, resp);
-	const out = harden({
-	  status: req.status,
-	  headers: Object.entries(byName).flatMap(nv => nv),
-	  body: true,
-	});
-	console.log('@@http shim responding:', out);
-	return out;
-      case 9:
-	if (buf.pos >= buf.content.length) {
-	  console.log('@@http shim: request done');
+      case Server.status:
+        req.path = val1;
+        req.method = val2;
+        break;
+
+      case Server.header:
+        req.headers[val1] = val2;
+        break;
+
+      case Server.headersComplete:
+        req.socket = forNode(socket);
+        if ((req.upgrade = checkUpgrade(req))) {
+          socket.callback = () => {}; // stop normal HTTP Request handling
+          return 'upgrade';
+        }
+        // process request body?
+        return req.method === 'POST' ? String : false;
+
+      case Server.requestComplete:
+        req.body = val1;
+        break;
+
+      case Server.prepareResponse:
+        if (req.upgrade) {
+          // assume upgrade event handler will reply
+          // Prevent moddable http from sending reply
+          console.log('@@@SHOULD NOT GET HERE!');
+          throw new Error('upgrade');
+        }
+        let status = 200;
+        const byName = {'content-type': 'text/plain'};
+        const resp = harden({
+          status(code) {
+            status = code;
+            return resp;
+          },
+          get statusCode() {
+            return status;
+          },
+          set(name, value) {
+            byName[name.toLowerCase()] = value;
+            return resp;
+          },
+          send(content) {
+            buf.content += content;
+            return resp;
+          },
+          json(data) {
+            byName['content-type'] = 'application/json';
+            buf.content = JSON.stringify(data);
+            return resp;
+          },
+        });
+        // ISSUE: harden(req);
+        console.log('@@http shim calling handler with:', req);
+        handler(req, resp);
+        const out = harden({
+          status,
+          // { h1: v1, h2: v2 } => [h1, v1, h2, v2]
+          headers: Object.entries(byName).flatMap(nv => nv),
+          body: true, // chunked
+        });
+        console.log('@@http shim prepared response:', out);
+        return out;
+
+      case Server.responseFragment:
+        if (buf.pos >= buf.content.length) {
+          console.log('@@http shim: response done');
 	  return undefined;
 	}
 	const okToTx = val1;
 	const chunk = buf.content.slice(buf.pos, buf.pos + okToTx);
 	buf.pos += okToTx;
-	console.log('@@http shim chunk:', okToTx, chunk.slice(0, 16));
+	console.log('@@http shim response chunk:', okToTx, JSON.stringify(chunk.slice(0, 16)));
 	return chunk;
+
+      // TODO: case Server.error:
       }
+
       return undefined;
     };
+
     listening();
   }
 

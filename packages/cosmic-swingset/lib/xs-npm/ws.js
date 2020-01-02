@@ -1,6 +1,8 @@
 import harden from '@agoric/harden';
 
 import xsws from "xs-net/websocket";
+import Base64 from "base64";
+import {Digest} from "crypt";
 
 
 const later = thunk => Promise.resolve(null).then(thunk);
@@ -12,16 +14,16 @@ function makeEmitter() {
   return harden({
     on(name, handler) {
       if (name in byName) {
-	byName[name].push(handler);
+        byName[name].push(handler);
       } else {
-	byName[name] = [handler];
+        byName[name] = [handler];
       }
     },
     emit(name, ...args) {
       const handlers = byName[name];
       if (!handlers) { return; }
       for (const handler of handlers) {
-	later(() => handler(...args));
+        later(() => handler(...args));
       }
     }
   });
@@ -31,9 +33,7 @@ function WebSocket({ path, host, headers, protocol, socket }) {
   const events = makeEmitter();
   const xclient = new xsws.Client({ path, host, headers, protocol, socket });
 
-  function emit(name, ...args) {
-    events.emit(name, ...args);
-  }
+  const emit = events.emit;
 
   xclient.callback = function(message, value) {
     switch (message) {
@@ -51,16 +51,34 @@ function WebSocket({ path, host, headers, protocol, socket }) {
   const OPEN = 1;
   return harden({
     connection: socket,
-    readyState: OPEN,
+    readyState: OPEN, // ISSUE: support other states?
     OPEN,
     emit,
-    on(name, ...args) {
-      events.on(name, ...args);
-    },
+    on: events.on,
     send(message) {
       xclient.write(message);
     },
   });
+}
+
+
+function handshakeResponse(key, protocol) {
+  let sha1 = new Digest("SHA1");
+  sha1.write(key);
+  sha1.write('258EAFA5-E914-47DA-95CA-C5AB0DC85B11');
+
+  const response = [
+    "HTTP/1.1 101 Web Socket Protocol Handshake\r\n",
+    "Connection: Upgrade\r\n",
+    "Upgrade: websocket\r\n",
+    "Sec-WebSocket-Accept: ", Base64.encode(sha1.close()), "\r\n",
+  ];
+
+  if (protocol) {
+    response.push("Sec-WebSocket-Protocol: ", protocol, "\r\n");
+  }
+  response.push("\r\n");
+  return response;
 }
 
 export function Server({ noServer }) {
@@ -82,10 +100,35 @@ export function Server({ noServer }) {
     on,
     handleUpgrade(nodeReq, nodeSocket, head, wsHandler) {
       // TODO: only handle given path?
+      console.log('@@handleUpgrade', nodeReq, nodeSocket, head, wsHandler);
       const { path, host, headers } = nodeReq;
+
+      const key = headers['sec-websocket-key'];
+      if (headers['sec-websocket-version'] !== '13' || !key) {
+	// not a valid websocket handshake
+	// ISSUE: report error somewhere?
+	return;
+      }
+      const protocol = undefined;  // ISSUE: TODO? needed?
+      const response = handshakeResponse(key, protocol);
+      console.log('@@handleUpgrade response', response);
+
       const { _xs_socket: socket } = nodeSocket;
-      const protocol = 'TODO';
-      console.log('@@shim TODO!!! actually handle upgrade');
+      console.log('@@handleUpgrade socket.write(response)');
+      try {
+      socket.write.apply(socket, response);
+      } catch (wtf) {
+	console.error('@@handleUpgrade socket.write:', wtf.message);
+      }
+      console.log('@@handleUpgrade socket.read()...');
+      const toRead = socket.read();
+      console.log('@@... handleUpgrade socket.read() done.');
+      if (toRead !== 0) {
+	// unexpected to receive a websocket message before server receives handshake
+	console.log('@@unexpected to receive a websocket message before server receives handshake', toRead);
+	throw new Error('not implemented: message with handshake');
+      }
+
       console.log('@@ws shim handleUpgrade making WebSocket:', { path, host, headers, protocol, socket });
       const ws = WebSocket({ path, host, headers, protocol, socket });
       later(() => wsHandler(ws));
