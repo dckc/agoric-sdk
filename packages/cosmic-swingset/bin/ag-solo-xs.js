@@ -6,6 +6,8 @@ export default async function main() {
 
   try {
     await solo('ag-solo-xs', ['start']);
+    // start should run forever
+    await new Promise(() => null);
   } catch (oops) {
     console.error(oops);
     console.error(oops.message);
