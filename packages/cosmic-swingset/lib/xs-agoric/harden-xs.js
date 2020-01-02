@@ -7,4 +7,3 @@
 export default function harden(x) {
   return Object.freeze(x, true);
 }
-

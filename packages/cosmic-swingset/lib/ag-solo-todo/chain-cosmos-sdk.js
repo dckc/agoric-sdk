@@ -1,4 +1,3 @@
 export function connectToChain() {
-  throw('todo');
+  throw new Error('XS TODO: chain-cosmos-sdk');
 }
-

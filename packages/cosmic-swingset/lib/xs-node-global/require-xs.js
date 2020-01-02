@@ -15,9 +15,11 @@ function rtrim(text, suffix) {
   return text;
 }
 
-/// require() for pre-compiled modules
+// require() for pre-compiled modules
 export function require(specifier) {
-  console.warn(`require(${specifier}): xs approach is limited to pre-compiled modules`);
+  console.warn(
+    `require(${specifier}): xs approach is limited to pre-compiled modules`,
+  );
 
   // Turn specifiers back into what xs manifest expects.
   const modName = rtrim(ltrim(specifier, './'), '.js');
