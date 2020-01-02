@@ -18,12 +18,9 @@ function makeServeStatic(files) {
   const index = files.resolve('index.html');
 
   return function staticHandler(req, res, next) {
-    console.log('@@express.static', req.method, req.path);
+    // console.log('express.static', req.method, req.path);
 
-    if (req.method !== 'GET') {
-      next();
-      return;
-    }
+    if (req.method !== 'GET') { next(); return; }
 
     let file;
     if (req.path === '/' && index.exists()) {

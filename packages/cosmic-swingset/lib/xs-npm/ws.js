@@ -100,7 +100,7 @@ export function Server({ noServer }) {
     on,
     handleUpgrade(nodeReq, nodeSocket, head, wsHandler) {
       // TODO: only handle given path?
-      console.log('@@handleUpgrade', nodeReq, nodeSocket, head, wsHandler);
+      // console.log('handleUpgrade', nodeReq, nodeSocket, head, wsHandler);
       const { path, host, headers } = nodeReq;
 
       const key = headers['sec-websocket-key'];
@@ -111,25 +111,16 @@ export function Server({ noServer }) {
       }
       const protocol = undefined;  // ISSUE: TODO? needed?
       const response = handshakeResponse(key, protocol);
-      console.log('@@handleUpgrade response', response);
 
       const { _xs_socket: socket } = nodeSocket;
-      console.log('@@handleUpgrade socket.write(response)');
-      try {
-      socket.write.apply(socket, response);
-      } catch (wtf) {
-	console.error('@@handleUpgrade socket.write:', wtf.message);
-      }
-      console.log('@@handleUpgrade socket.read()...');
+      socket.write(...response);
       const toRead = socket.read();
-      console.log('@@... handleUpgrade socket.read() done.');
       if (toRead !== 0) {
-	// unexpected to receive a websocket message before server receives handshake
-	console.log('@@unexpected to receive a websocket message before server receives handshake', toRead);
+	console.warn('unexpected to receive a websocket message before server receives handshake', toRead);
 	throw new Error('not implemented: message with handshake');
       }
 
-      console.log('@@ws shim handleUpgrade making WebSocket:', { path, host, headers, protocol, socket });
+      // console.log('ws shim handleUpgrade making WebSocket:', { path, host, headers, protocol, socket });
       const ws = WebSocket({ path, host, headers, protocol, socket });
       later(() => wsHandler(ws));
     },

@@ -47,12 +47,7 @@ export function createServer(handler) {
     let upgrade = false;
     const tokens = txt => txt.split(',').map(tok => tok.trim().toLowerCase());
 
-    console.log('@@http shim got request head:', JSON.stringify({
-      req,
-      hasUpgrade: 'upgrade' in req.headers,
-      hasConnection: 'connection' in req.headers,
-      connectionUpgrade: tokens(req.headers['connection']).includes('upgrade'),
-    }, null, 2));
+    // console.log('http shim got request head:', JSON.stringify(req, null, 2));
 
     if ('upgrade' in req.headers &&
         'connection' in req.headers &&
@@ -64,7 +59,7 @@ export function createServer(handler) {
         socket: req.socket,
       };
       const bodyHead = '';  // ISSUE: data pending in socket?
-      console.log('@@emit upgrade');
+      // console.log('emit upgrade');
       events.emit('upgrade', nodeReq, req.socket, bodyHead);
     }
     return upgrade;
@@ -104,14 +99,11 @@ export function createServer(handler) {
         break;
 
       case Server.prepareResponse:
-        if (req.upgrade) {
-          // assume upgrade event handler will reply
-          // Prevent moddable http from sending reply
-          console.log('@@@SHOULD NOT GET HERE!');
-          throw new Error('upgrade');
-        }
+        if (req.upgrade) { throw new Error('BUG: upgrade requests reached prepareResponse'); }
+
         let status = 200;
         const byName = {'content-type': 'text/plain'};
+
         const resp = harden({
           status(code) {
             status = code;
@@ -134,27 +126,30 @@ export function createServer(handler) {
             return resp;
           },
         });
-        // ISSUE: harden(req);
-        console.log('@@http shim calling handler with:', req);
+
+        // ISSUE: harden(req);?
+        // console.log('http shim: calling handler with:', req);
         handler(req, resp);
-        const out = harden({
+
+        // { h1: v1, h2: v2 } => [h1, v1, h2, v2]
+	const flatten = byName => Object.entries(byName).flatMap(nv => nv);
+        const response = harden({
           status,
-          // { h1: v1, h2: v2 } => [h1, v1, h2, v2]
-          headers: Object.entries(byName).flatMap(nv => nv),
+          headers: flatten(byName),
           body: true, // chunked
         });
-        console.log('@@http shim prepared response:', out);
-        return out;
+        // console.log('http shim prepared response:', response);
+        return response;
 
       case Server.responseFragment:
         if (buf.pos >= buf.content.length) {
-          console.log('@@http shim: response done');
+          // console.log('http shim: response done');
 	  return undefined;
 	}
 	const okToTx = val1;
 	const chunk = buf.content.slice(buf.pos, buf.pos + okToTx);
 	buf.pos += okToTx;
-	console.log('@@http shim response chunk:', okToTx, JSON.stringify(chunk.slice(0, 16)));
+	// console.log('http shim: response chunk:', okToTx, JSON.stringify(chunk.slice(0, 16)));
 	return chunk;
 
       // TODO: case Server.error:

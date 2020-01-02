@@ -6,7 +6,6 @@ function express() {
   const routes = [];
 
   function tryRoutes(req, res) {
-    console.log('@@tryRoutes', routes);
     for (const { method, path, callback } of routes) {
       if (req.method === method && req.path === path) {
 	callback(req, res);
@@ -49,8 +48,7 @@ function express() {
 
 express.json = function() {
   return function jsonHandler(req, res, next) {
-    console.log('@@jsonHandler', req, res);
-    console.log('@@json content-type?', req.headers['content-type']);
+    // console.log('jsonHandler', req.headers['content-type']);
     if (typeof req.body === 'string' &&
 	req.headers['content-type'] === 'application/json') {
       let data;
