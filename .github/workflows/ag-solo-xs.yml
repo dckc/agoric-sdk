@@ -48,3 +48,16 @@ jobs:
         node -r esm $TAPE/bin/tape-xs-build.js $PWD test/test*.js
         mcconfig -m -p x-cli-lin test-xs-manifest.json
         $MODDABLE/build/bin/lin/release/marshal
+    - name: build ag-solo for xs
+      run: |
+        export MODDABLE=$HOME/moddable
+        export PATH=$MODDABLE/build/bin/lin/release:$PATH
+        cd packages/cosmic-swingset
+        make -f ag-solo-xs.mk MODDABLE=$MODDABLE
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: packages/cosmic-swingset/bin/ag-solo-xs
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

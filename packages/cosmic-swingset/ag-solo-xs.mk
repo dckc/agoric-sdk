@@ -5,8 +5,13 @@ PKG=cosmic-swingset
 
 BASEDIR=t3
 
-check-start: $(MODDABLE)/build/bin/lin/release/cosmic-swingset ../SwingSet/src/bundles/mailbox-src.js t3/vats/bootstrap-src.js
+./bin/ag-solo-xs: $(MODDABLE)/build/bin/lin/release/cosmic-swingset
+	cp $(MODDABLE)/build/bin/lin/release/cosmic-swingset $@
+
+check-start: ./bin/ag-solo-xs ../SwingSet/src/bundles/mailbox-src.js t3/vats/bootstrap-src.js
 	cd $(BASEDIR) && $(MODDABLE)/build/bin/lin/release/cosmic-swingset start --role=three_client
+
+build: $(MODDABLE)/build/bin/lin/release/cosmic-swingset
 
 $(MODDABLE)/build/bin/lin/release/cosmic-swingset: ./bin/ag-solo-xs.js lib/ag-solo/*.js lib/xs-npm/*.js lib/xs-node-global/*.js lib/xs-node-api/*.js lib/ag-solo-todo/*.js
 	mcconfig -m -p x-cli-lin ag-solo-xs-manifest.json
@@ -42,6 +47,8 @@ debug-build: vat-device-bundles t3 t3/vats/bootstrap-src.js
 	mcconfig -d -p lin -m ag-solo-xs-manifest.json
 
 clean:
+	-rm -rf ./bin/ag-solo-xs
+	-rm -rf $(MODDABLE)/build/bin/lin/release/$(PKG)
 	-rm -rf $(MODDABLE)/build/tmp/lin/release/$(PKG)
 	-rm -f $(MODDABLE)/build/bin/lin/release/$(PKG)
 	-rm -rf $(MODDABLE)/build/tmp/lin/debug/$(PKG)
