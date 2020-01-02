@@ -4,13 +4,17 @@ import harden from '@agoric/harden';
 import Nat from '@agoric/nat';
 
 const DEBUG_FLAG = false;
-const DEBUG = (...args) => { if (DEBUG_FLAG) { console.log('===ses:', args); } };
-
+const DEBUG = (...args) => {
+  if (DEBUG_FLAG) {
+    console.log('===ses:', args);
+  }
+};
 
 export function evaluateExpr(expr, endowments) {
-  DEBUG('evaluateExpr endowments:',
-	JSON.stringify(Object.entries(endowments)
-		       .map(([k, v]) => [k, typeof v])));
+  DEBUG(
+    'evaluateExpr endowments:',
+    JSON.stringify(Object.entries(endowments).map(([k, v]) => [k, typeof v])),
+  );
   // ISSUE: check that params are valid identifiers
   const params = Object.keys(endowments || {}).join(', ');
   const wrap = `(function ({${params}}) { return ${expr}; })`;
@@ -35,7 +39,7 @@ function evaluateModule(src, endowments) {
 }
 
 function makeEvaluators(options) {
-  if(Object.keys(options).length > 0) {
+  if (Object.keys(options).length > 0) {
     console.log('WARNING: not implemented:', Object.keys(options));
   }
 
@@ -48,33 +52,32 @@ function makeEvaluators(options) {
 
 function agRequire(modSpec) {
   DEBUG(`agRequire(${modSpec})\n`);
-  switch(modSpec) {
-  case '@agoric/harden':
-    return harden({ default: harden });
-  case '@agoric/nat':
-    return harden({ default: Nat });
-  case '@agoric/evaluate':
-    return harden({
-      default: evaluateExpr,
-      evaluateExpr,
-      evaluateProgram,
-      evaluateModule,
-      makeEvaluators,
-    });
-  default:
-    throw('bad module or something?');
+  switch (modSpec) {
+    case '@agoric/harden':
+      return harden({ default: harden });
+    case '@agoric/nat':
+      return harden({ default: Nat });
+    case '@agoric/evaluate':
+      return harden({
+        default: evaluateExpr,
+        evaluateExpr,
+        evaluateProgram,
+        evaluateModule,
+        makeEvaluators,
+      });
+    default:
+      throw 'bad module or something?';
   }
 }
-
 
 const SES = { makeSESRootRealm, confine, confineExpr };
 
 function confine() {
-  throw('TODO!@@');
+  throw 'TODO!@@';
 }
 
 function confineExpr() {
-  throw('TODO!@@');
+  throw 'TODO!@@';
 }
 
 const makeRealmSrc = `(
@@ -97,13 +100,24 @@ function makeRealm() {
 
 export function makeSESRootRealm(options) {
   // console.log('makeSESRootRealm', { optionKeys: Object.keys(options) });
-  const { ses, '@agoric/harden': agHarden, '@agoric/nat': agNat } = Compartment.map;
+  const {
+    ses,
+    '@agoric/harden': agHarden,
+    '@agoric/nat': agNat,
+  } = Compartment.map;
   const map = { ses, '@agoric/harden': agHarden, '@agoric/nat': agNat };
   const optEndowments = options.consoleMode == 'allow' ? { console } : {};
-  const makeCompartment = (...args) => new Compartment('ses', { ...optEndowments, SES }, map);
+  const makeCompartment = (...args) =>
+    new Compartment('ses', { ...optEndowments, SES }, map);
 
   const c = makeCompartment();
-  const makeRealm = c.export.evaluateExpr(makeRealmSrc, { makeCompartment, evaluateExpr, DEBUG, agRequire, harden });
+  const makeRealm = c.export.evaluateExpr(makeRealmSrc, {
+    makeCompartment,
+    evaluateExpr,
+    DEBUG,
+    agRequire,
+    harden,
+  });
   const realm = makeRealm();
   DEBUG('new realm:', typeof realm.makeRequire({}));
   return realm;

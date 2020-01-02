@@ -1,11 +1,11 @@
 import harden from '@agoric/harden';
 
+import { File, Iterator } from 'file'; // beware: powerful!
 import { makePath, resolve } from './pathlib';
 import process from './process';
 
-import { File, Iterator } from 'file';  // beware: powerful!
-
-export function makePathAccess(path) {  // ISSUE: beyond node fs API
+export function makePathAccess(path) {
+  // ISSUE: beyond node fs API
   return makePath(path, { File, Iterator });
 }
 
@@ -58,14 +58,15 @@ const openFiles = (() => {
   });
 })();
 
-
 function later(thunk) {
   Promise.resolve(null).then(thunk);
 }
 
 const promises = harden({
   write(fd, text) {
-    later(() => { openFiles.lookup(fd).write(text); });
+    later(() => {
+      openFiles.lookup(fd).write(text);
+    });
   },
   close(fd) {
     later(() => openFiles.close(fd));

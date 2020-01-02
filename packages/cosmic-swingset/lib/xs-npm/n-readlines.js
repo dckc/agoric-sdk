@@ -1,6 +1,6 @@
 import harden from '@agoric/harden';
+import { File, Iterator } from 'file'; // beware: powerful!
 import { makePath } from './pathlib';
-import { File, Iterator } from 'file';  // beware: powerful!
 
 export default function readlines(path) {
   const p = makePath(path, { File, Iterator });
@@ -9,10 +9,9 @@ export default function readlines(path) {
   return harden({
     next() {
       if (ix >= lines.length) {
-	return false;
+        return false;
       }
       return lines[ix++];
-    }
+    },
   });
 }
-

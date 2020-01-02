@@ -1,4 +1,3 @@
 export default function todo() {
-  throw('todo');
+  throw new Error('XS TODO: bundle');
 }
-

@@ -3,7 +3,7 @@ const byToken = {
   url: req => req.path, // ISSUE: full url?
   status: (_, res) => res.statusCode,
   res: (req, res, key) => req.headers[key],
-  'response-time': res => '???',  // ISSUE: response time
+  'response-time': res => '???', // ISSUE: response time
 };
 
 const pattern = /(?<prefix>[^:]*)(:(?<token>[-a-z]+)(\[(?<key>[^\]]+)\])?)?/g;
@@ -19,12 +19,12 @@ export default function morgan(format) {
     onFinished(req, () => {
       const out = [];
       for (const { groups: g } of format.matchAll(pattern)) {
-	out.push(g.prefix);
-	const decode = byToken[g.token];
-	if (typeof decode === 'function') {
-	  out.push(decode(req, res, g.key));
-	}
-      };
+        out.push(g.prefix);
+        const decode = byToken[g.token];
+        if (typeof decode === 'function') {
+          out.push(decode(req, res, g.key));
+        }
+      }
       console.log(out.join(''));
       next();
     });

@@ -2,7 +2,7 @@ import harden from '@agoric/harden';
 
 import Resource from 'Resource';
 
-import fs from 'fs';  // beware: powerful!
+import fs from 'fs'; // beware: powerful!
 
 const genesisVats = {
   './vats/vat-tp': '@agoric.vattp.js',
