@@ -117,7 +117,7 @@ export function Server({ noServer }) {
       const response = handshakeResponse(key, protocol);
 
       const { _xs_socket: socket } = nodeSocket;
-      socket.write(...response);
+      socket.write.apply(socket, response);
       const toRead = socket.read();
       if (toRead !== 0) {
         console.warn(
