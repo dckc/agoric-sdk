@@ -109,6 +109,23 @@ export function createServer(handler) {
           let status = 200;
           const byName = { 'content-type': 'text/plain' };
 
+	const responseP = new Promise((resolve, reject) => {
+	  // ISSUE: reject all errors
+
+	  function send(content) {
+            buf.content += content;
+
+            // { h1: v1, h2: v2 } => [h1, v1, h2, v2]
+            const flatten = byName => Object.entries(byName).flatMap(nv => nv);
+            const response = harden({
+              status,
+              headers: flatten(byName),
+              body: true, // chunked
+            });
+            // console.log('http shim prepared response:', response);
+            resolve(response);
+	  }
+
           const resp = harden({
             status(code) {
               status = code;
@@ -121,30 +138,18 @@ export function createServer(handler) {
               byName[name.toLowerCase()] = value;
               return resp;
             },
-            send(content) {
-              buf.content += content;
-              return resp;
-            },
+            send,
             json(data) {
               byName['content-type'] = 'application/json';
-              buf.content = JSON.stringify(data);
-              return resp;
+              send(JSON.stringify(data));
             },
           });
 
           // ISSUE: harden(req);?
           // console.log('http shim: calling handler with:', req);
           handler(req, resp);
-
-          // { h1: v1, h2: v2 } => [h1, v1, h2, v2]
-          const flatten = byName => Object.entries(byName).flatMap(nv => nv);
-          const response = harden({
-            status,
-            headers: flatten(byName),
-            body: true, // chunked
-          });
-          // console.log('http shim prepared response:', response);
-          return response;
+	});
+	return responseP;
 
         case Server.responseFragment:
           if (buf.pos >= buf.content.length) {
