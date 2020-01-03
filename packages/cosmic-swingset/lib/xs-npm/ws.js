@@ -30,36 +30,49 @@ function makeEmitter() {
   });
 }
 
+const readyStates = {
+  CONNECTING: 0,
+  OPEN: 1,
+  CLOSING: 2,
+  CLOSED: 3
+};
+
 function WebSocket({ path, host, headers, protocol, socket }) {
   const events = makeEmitter();
   const xclient = new xsws.Client({ path, host, headers, protocol, socket });
 
   const { emit } = events;
+  const OPEN = 1;
+  let readyState = readyStates.CONNECTING;
 
   xclient.callback = function(message, value) {
     switch (message) {
       case xsws.Client.connect:
+        readyState = readyStates.OPEN;
         emit('connection');
         break;
       case xsws.Client.receive:
         emit('message', value);
         break;
-      case xsws.Client.disconnect:
+    case xsws.Client.disconnect:
+        readyState = readyStates.CLOSED;
         emit('close');
     }
   };
 
-  const OPEN = 1;
-  return harden({
+  // ISSUE: cannot harden socket
+  return {
     connection: socket,
-    readyState: OPEN, // ISSUE: support other states?
-    OPEN,
+    get readyState() {
+      return readyState;
+    },
     emit,
     on: events.on,
     send(message) {
       xclient.write(message);
     },
-  });
+    ...readyStates,
+  };
 }
 
 function handshakeResponse(key, protocol) {
