@@ -1,7 +1,7 @@
 // lib/ag-solo/web.js depends on URL global
 // https://nodejs.org/api/globals.html#globals_url
 
-import harden from '@agoric/harden';
+const harden = x => Object.freeze(x, true);
 
 function URL(addr) {
   const m = addr.match(/^(?<protocol>[^:]+:)\/\/(?<hostname>[^/:]*)/);

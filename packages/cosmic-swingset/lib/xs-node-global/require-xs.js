@@ -1,5 +1,5 @@
 /* global globalThis, Compartment */
-import harden from '@agoric/harden';
+const harden = x => Object.freeze(x, true);
 
 function ltrim(text, prefix) {
   if (text.startsWith(prefix)) {
