@@ -1,6 +1,6 @@
 import harden from '@agoric/harden';
 
-import Resource from 'Resource';
+import Resource from 'moddable-sdk/files/resource/Resource';
 
 import fs from 'fs'; // beware: powerful!
 
