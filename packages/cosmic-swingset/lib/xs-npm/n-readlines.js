@@ -1,6 +1,6 @@
 import harden from '@agoric/harden';
 import { File, Iterator } from 'file'; // beware: powerful!
-import { makePath } from './pathlib';
+import { makePath } from '../xs-node-api/pathlib';
 
 export default function readlines(path) {
   const p = makePath(path, { File, Iterator });
