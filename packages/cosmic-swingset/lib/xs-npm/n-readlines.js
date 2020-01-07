@@ -1,5 +1,5 @@
 import harden from '@agoric/harden';
-import { File, Iterator } from 'file'; // beware: powerful!
+import { File, Iterator } from 'moddable-sdk/files/file/file'; // beware: powerful!
 import { makePath } from '../xs-node-api/pathlib';
 
 export default function readlines(path) {

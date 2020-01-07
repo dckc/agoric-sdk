@@ -1,4 +1,4 @@
-import { Server } from 'xs-net/http'; // beware: powerful!
+import { Server } from 'moddable-sdk/network/http/http'; // beware: powerful!
 
 import harden from '@agoric/harden';
 

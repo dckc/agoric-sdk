@@ -1,8 +1,8 @@
 import harden from '@agoric/harden';
 
-import xsws from 'xs-net/websocket';
-import Base64 from 'base64';
-import { Digest } from 'crypt';
+import xsws from 'moddable-sdk/network/websocket/websocket';
+import Base64 from 'moddable-sdk/data/base64/base64';
+import { Digest } from 'moddable-sdk/crypt/digest/crypt';
 
 const later = thunk => Promise.resolve(null).then(thunk);
 
