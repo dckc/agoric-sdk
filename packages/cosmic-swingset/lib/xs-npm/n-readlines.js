@@ -1,10 +1,16 @@
 import harden from '@agoric/harden';
-import { File, Iterator } from 'moddable-sdk/files/file/file'; // beware: powerful!
-import { makePath } from '../xs-node-api/pathlib';
+import fs from 'fs';
+
+function readlinesSync(path) {
+  const text = fs.readFileSync(path);
+  if (text === '') {
+    return [];
+  }
+  return text.replace(/\n$/, '').split('\n');
+}
 
 export default function readlines(path) {
-  const p = makePath(path, { File, Iterator });
-  const lines = p.readlinesSync(0);
+  const lines = readlinesSync(path);
   let ix = 0;
   return harden({
     next() {

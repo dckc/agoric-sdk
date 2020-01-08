@@ -3,6 +3,8 @@ import harden from '@agoric/harden';
 
 import { makePath, join, resolve } from './pathlib';
 
+export { join };
+
 export function isAbsolute(path) {
   return path.startsWith('/');
 }

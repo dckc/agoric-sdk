@@ -1,4 +1,9 @@
-// TODO
-import harden from '@agoric/harden';
+export function execFile() {
+  throw 'TODO: execFileSync';
+}
 
-export default harden({});
+export function execFileSync() {
+  throw 'TODO: execFileSync';
+}
+
+export default { execFile, execFileSync };

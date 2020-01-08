@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { join } from './pathlib';
+import { join } from 'path';
 
 export function open({ dir, prefix }, cb) {
   // Always defer callbacks to a future turn.

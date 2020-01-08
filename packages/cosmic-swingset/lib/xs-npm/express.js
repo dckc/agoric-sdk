@@ -1,6 +1,6 @@
 import harden from '@agoric/harden';
 
-import serveStatic from './serve-static';
+import serveStatic from 'serve-static';
 
 function express() {
   const routes = [];
