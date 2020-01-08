@@ -1,5 +1,7 @@
 export MODDABLE := $(HOME)/projects/moddable
 export PATH := $(MODDABLE)/build/bin/lin/release:$(PATH)
+WORKSPACE=~/projects/agoric/agoric-sdk
+TAPE_XS=~/projects/agoric/tape-xs
 
 PKG=cosmic-swingset
 
@@ -11,7 +13,7 @@ BASEDIR=t3
 check-start: ./bin/ag-solo-xs
 	cd $(BASEDIR) && ../bin/ag-solo-xs start --role=three_client
 
-$(MODDABLE)/build/bin/lin/release/cosmic-swingset: ./bin/ag-solo-xs.js lib/ag-solo/*.js lib/xs-npm/*.js lib/xs-node-global/*.js lib/xs-node-api/*.js lib/ag-solo-todo/*.js ../SwingSet/src/bundles/mailbox-src.js $(BASEDIR)/vats/bootstrap-src.js
+$(MODDABLE)/build/bin/lin/release/cosmic-swingset: ./bin/ag-solo-xs.js lib/ag-solo/*.js lib/xs-npm/*.js lib/xs-node-global/*.js lib/xs-node-api/*.js lib/ag-solo-todo/*.js ../SwingSet/src/bundles/mailbox-src.js $(BASEDIR)/vats/bootstrap-src.js ag-solo-xs-manifest.json
 	mcconfig -m -p x-cli-lin ag-solo-xs-manifest.json
 
 # run in simulator and xsbug
@@ -44,11 +46,15 @@ vat-device-bundles: ../SwingSet/src/bundles/mailbox-src.js
 debug-build: vat-device-bundles $(BASEDIR)/vats/bootstrap-src.js
 	mcconfig -d -p lin -m ag-solo-xs-manifest.json
 
+./lib/xs-compartments.json: ./lib/*.js ./lib/*/*.js
+	cd lib; XS_NPM=xs-npm XS_NODE_API=xs-node-api node -r esm $(TAPE_XS)/bin/modlinks.js $(WORKSPACE) ag-solo/main.js
+
 clean:
+	-rm -f ./lib/xs-compartments.json
+	-rm -f ./test/xs-compartments.json
 	-rm -rf ./bin/ag-solo-xs
 	-rm -rf $(BASEDIR)
-	-rm -rf $(MODDABLE)/build/bin/lin/release/$(PKG)
-	-rm -rf $(MODDABLE)/build/tmp/lin/release/$(PKG)
 	-rm -f $(MODDABLE)/build/bin/lin/release/$(PKG)
-	-rm -rf $(MODDABLE)/build/tmp/lin/debug/$(PKG)
 	-rm -f $(MODDABLE)/build/bin/lin/debug/$(PKG)
+	-rm -rf $(MODDABLE)/build/tmp/lin/release/$(PKG)
+	-rm -rf $(MODDABLE)/build/tmp/lin/debug/mc/$(PKG)
