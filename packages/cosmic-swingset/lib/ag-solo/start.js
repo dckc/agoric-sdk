@@ -10,15 +10,15 @@ import readlines from 'n-readlines';
 
 import {
   loadBasedir,
+  buildCommand,
   buildVatController,
   buildMailboxStateMap,
   buildMailbox,
+  buildStorageInMemory,
   buildTimer,
   getVatTPSourcePath,
   getCommsSourcePath,
   getTimerWrapperSourcePath,
-  buildStorageInMemory,
-  buildCommand,
 } from '@agoric/swingset-vat';
 
 import { deliver, addDeliveryTarget } from './outbound';
