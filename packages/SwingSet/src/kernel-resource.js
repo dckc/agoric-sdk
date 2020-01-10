@@ -1,7 +1,7 @@
 import harden from '@agoric/harden';
 
 // eslint-disable-next-line import/no-unresolved
-import Resource from 'Resource';
+import Resource from 'moddable-sdk/files/resource/Resource';
 
 /**
  * In the original node.js approach, the bundles/kernel module exports
