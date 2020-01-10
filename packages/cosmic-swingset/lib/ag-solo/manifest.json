@@ -1,0 +1,47 @@
+{
+  "include": [
+    "$(MODDABLE)/examples/manifest_base.json",
+    "./xs-compartments.json"
+  ],
+  "creation": {
+    "keys": {
+      "available": 4096
+    },
+    "stack": 4096
+  },
+  "strip": [],
+  "preload": [
+    "xs-node-global/*"
+  ],
+  "modules": {
+    "main": "../../bin/ag-solo-xs",
+    "xs-node-global/*": "../xs-node-global/*",
+
+    "workspace/node_modules/@agoric/swingset-vat/src/bundles/kernel": "../../../SwingSet/src/kernel-resource",
+
+    "moddable-sdk/_MAKEDIR": "/dev/null",
+    "moddable-sdk/files/_MAKEDIR": "/dev/null",
+    "moddable-sdk/data/_MAKEDIR": "/dev/null",
+    "moddable-sdk/files/file/*": [ "$(MODULES)/files/file/*", "$(MODULES)/files/file/lin/*" ],
+    "*":  [
+      "$(MODULES)/data/base64/*",
+      "$(MODULES)/data/logical/*",
+      "$(MODULES)/crypt/digest/*",
+      "$(MODULES)/crypt/digest/kcl/*"
+    ],
+    "socket": [
+      "$(MODULES)/network/socket/*",
+      "$(MODULES)/network/socket/lin/*"
+    ],
+  },
+  "data": {
+    "agoric.kernel.js": "../../../SwingSet/src/bundles/kernel",
+    "@agoric.mailbox-src": "../../../SwingSet/src/bundles/mailbox-src",
+    "@agoric.command-src": "../../../SwingSet/src/bundles/command-src",
+    "@agoric.timer-src": "../../../SwingSet/src/bundles/timer-src",
+    "@agoric.comms": "../../../SwingSet/src/bundles/vat_comms-src",
+    "@agoric.vattp": "../../../SwingSet/src/bundles/vat_vattp-src",
+    "@agoric.vat-timerWrapper": "../../../SwingSet/src/bundles/vat_timer-src",
+    "xs-compartments": "./xs-compartments"
+  }
+}
