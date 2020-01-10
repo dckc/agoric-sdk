@@ -1,7 +1,6 @@
 {
   "build": {
     "MODULES": "$(MODDABLE)/modules",
-    "WORKSPACE": "/home/connolly/projects/agoric/agoric-sdk",
     "XS_NODE_API": "$(WORKSPACE)/packages/cosmic-swingset/lib/xs-node-api",
     "XS_NPM": "$(WORKSPACE)/packages/cosmic-swingset/lib/xs-npm"
   },

@@ -52,6 +52,7 @@ jobs:
       run: |
         export MODDABLE=$HOME/moddable
         export PATH=$MODDABLE/build/bin/lin/release:$PATH
+        export WORKSPACE=$GITHUB_WORKSPACE
         cd packages/cosmic-swingset
         make -f ag-solo-xs.mk MODDABLE=$MODDABLE
     - name: Release

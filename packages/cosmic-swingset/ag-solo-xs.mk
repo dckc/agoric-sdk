@@ -1,7 +1,7 @@
-export MODDABLE := $(HOME)/projects/moddable
+# export MODDABLE := $(HOME)/projects/moddable
+# export WORKSPACE=~/projects/agoric/agoric-sdk
+# TAPE_XS=~/projects/agoric/tape-xs
 export PATH := $(MODDABLE)/build/bin/lin/release:$(PATH)
-export WORKSPACE=~/projects/agoric/agoric-sdk
-TAPE_XS=~/projects/agoric/tape-xs
 
 PKG=ag-solo
 
