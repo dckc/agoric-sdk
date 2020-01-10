@@ -30,7 +30,7 @@ export default async function main() {
     cmap[internal] = Compartment.map[external];
   }
 
-  const endowments = { console, require, setImmediate };
+  const endowments = { console, require, setImmediate, setInterval, URL };
   const solo = new Compartment(info.root, endowments, cmap).export.default;
 
   try {
