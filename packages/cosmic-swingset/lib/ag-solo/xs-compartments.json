@@ -128,7 +128,6 @@
     "workspace/node_modules/@agoric/eventual-send/src/index": "$(WORKSPACE)/node_modules/@agoric/eventual-send/src/index",
     "workspace/node_modules/@agoric/marshal/marshal": "$(WORKSPACE)/node_modules/@agoric/marshal/marshal",
     "workspace/node_modules/@agoric/nat/dist/nat.esm": "$(WORKSPACE)/node_modules/@agoric/nat/dist/nat.esm",
-    "workspace/node_modules/@agoric/swingset-vat/src/bundles/kernel": "$(WORKSPACE)/node_modules/@agoric/swingset-vat/src/bundles/kernel",
     "workspace/node_modules/@agoric/swingset-vat/src/capdata": "$(WORKSPACE)/node_modules/@agoric/swingset-vat/src/capdata",
     "workspace/node_modules/@agoric/swingset-vat/src/controller": "$(WORKSPACE)/node_modules/@agoric/swingset-vat/src/controller",
     "workspace/node_modules/@agoric/swingset-vat/src/devices/command": "$(WORKSPACE)/node_modules/@agoric/swingset-vat/src/devices/command",
