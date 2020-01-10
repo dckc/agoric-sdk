@@ -31,7 +31,6 @@ export default async function main() {
   }
 
   const endowments = { console, require, setImmediate };
-  debugger;
   const solo = new Compartment(info.root, endowments, cmap).export.default;
 
   try {
