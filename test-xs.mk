@@ -1,5 +1,5 @@
 export WORKSPACE=.
-TAPE=~/projects/agoric/tape-xs
+# TAPE=~/projects/agoric/tape-xs
 
 LIB=$(WORKSPACE)/packages/cosmic-swingset/lib
 XS_NPM=$(LIB)/xs-npm
