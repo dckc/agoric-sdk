@@ -22,32 +22,20 @@ jobs:
       run: |
         cd $HOME
         curl -L https://github.com/dckc/moddable/releases/download/v0.1.12-ag/moddable-linux-sdk.tgz | tar xzf -
-    - name: install tape-xs
+    - name: install tape-xs v0.1.2
       # ISSUE: merge into agoric-sdk?
       run: |
         cd $HOME
-        curl -L https://github.com/dckc/tape-xs/archive/ag01.tar.gz | tar xzf -
-        mv tape-xs-ag01 tape-xs
+        curl -L https://github.com/dckc/tape-xs/archive/v0.1.2.tar.gz | tar xzf -
+        mv tape-xs-0.1.2 tape-xs
         cd tape-xs
         yarn install
-    - name: test eventual-send on xs
+    - name: test eventual-send, marshal, captp packages on xs
       run: |
         export MODDABLE=$HOME/moddable
         export PATH=$MODDABLE/build/bin/lin/release:$PATH
         export TAPE=$HOME/tape-xs
-        cd packages/eventual-send
-        node -r esm $TAPE/bin/tape-xs-build.js $PWD test/test*.js
-        mcconfig -m -p x-cli-lin test-xs-manifest.json
-        $MODDABLE/build/bin/lin/release/eventual-send
-    - name: test marshal on xs
-      run: |
-        export MODDABLE=$HOME/moddable
-        export PATH=$MODDABLE/build/bin/lin/release:$PATH
-        export TAPE=$HOME/tape-xs
-        cd packages/marshal
-        node -r esm $TAPE/bin/tape-xs-build.js $PWD test/test*.js
-        mcconfig -m -p x-cli-lin test-xs-manifest.json
-        $MODDABLE/build/bin/lin/release/marshal
+        make -f test-xs.mk test
     - name: build ag-solo for xs
       run: |
         export MODDABLE=$HOME/moddable
