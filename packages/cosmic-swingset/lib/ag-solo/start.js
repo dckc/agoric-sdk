@@ -32,7 +32,21 @@ import bundle from './bundle';
 
 const CONTRACT_REGEXP = /^((zoe|contractHost)-([^.]+))/;
 
-const { write: fsWrite, close: fsClose, rename, unlink } = fs.promises;
+const { rename, unlink } = fs.promises;
+
+function asPromise(calling) {
+  return new Promise((resolve, reject) => {
+    calling((err, result) => {
+      if (err) {
+	reject(err);
+      } else {
+	resolve(result);
+      }
+    });
+  });
+}
+const fsWrite = (fd, buf) => asPromise(cb => fs.write(fd, buf, cb));
+const fsClose = (fd) => asPromise(cb => fs.close(fd, cb));
 
 async function atomicReplaceFile(filename, contents) {
   const info = await new Promise((resolve, reject) => {
