@@ -29,11 +29,13 @@ export default async function main() {
   for (const [internal, external] of Object.entries(native)) {
     cmap[internal] = Compartment.map[external];
   }
-
   const endowments = { console, require, setImmediate, setInterval, URL };
-  const solo = new Compartment(info.root, endowments, cmap).export.default;
 
   try {
+    // console.log('making compartment...');
+    const solo = new Compartment(info.root, endowments, cmap).export.default;
+    // console.log('got solo from compartment:', solo);
+
     await solo('ag-solo-xs', ['start']);
     // start should run forever
     await new Promise(() => null);
