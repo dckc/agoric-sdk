@@ -42,10 +42,13 @@ function WebSocket({ path, host, headers, protocol, socket }) {
   const xclient = new xsws.Client({ path, host, headers, protocol, socket });
 
   const { emit } = events;
-  const OPEN = 1;
-  let readyState = readyStates.CONNECTING;
+  // Since this is an upgrade, we're already connected.
+  let readyState = readyStates.OPEN;
+  xclient.state = 3;
+  xclient.doMask = false; // servers don't mask.
 
   xclient.callback = function(message, value) {
+    // console.log('WebSocket.callback:', message, value);
     switch (message) {
       case xsws.Client.connect:
         readyState = readyStates.OPEN;
@@ -54,11 +57,33 @@ function WebSocket({ path, host, headers, protocol, socket }) {
       case xsws.Client.receive:
         emit('message', value);
         break;
-    case xsws.Client.disconnect:
+      case xsws.Client.disconnect:
         readyState = readyStates.CLOSED;
+        if (value !== 0) {
+  	  emit('error', value);
+	}
         emit('close');
     }
   };
+
+  function send(data, options, cb) {
+    if (readyState === readyStates.CONNECTING) {
+      throw new Error('WebSocket is not open: readyState 0 (CONNECTING)');
+    } else if (readyState !== readyStates.OPEN) {
+      throw new Error('sendAfterClose not supported');
+    }
+    if (cb) {
+      throw new Error('callback not supported');
+    }
+    later(() => {
+      try {
+	const room = socket.write();
+	xclient.write(data);
+      } catch (err) {
+	emit('error', err);
+      }
+    });
+  }
 
   // ISSUE: cannot harden socket
   return {
@@ -68,9 +93,7 @@ function WebSocket({ path, host, headers, protocol, socket }) {
     },
     emit,
     on: events.on,
-    send(message) {
-      xclient.write(message);
-    },
+    send,
     ...readyStates,
   };
 }
