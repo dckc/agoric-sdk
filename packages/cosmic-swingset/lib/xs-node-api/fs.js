@@ -107,6 +107,24 @@ export function writeSync(fd, text) {
   openFiles.lookup(fd).write(text);
 }
 
+export function write(fd, text, callback) {
+  later(() => {
+    try {
+      openFiles.lookup(fd).write(text);
+      callback(null, text.length, text);
+    } catch (err) {
+      callback(err);
+    }
+  });
+}
+
+export function close(fd, callback) {
+  later(() => {
+    openFiles.close(fd);
+    callback(null);
+  });
+}
+
 export function closeSync(fd) {
   openFiles.close(fd);
 }
@@ -116,6 +134,7 @@ export function renameSync(from, to) {
 }
 
 export default {
+  close,
   closeSync,
   openSync,
   promises,
@@ -124,5 +143,6 @@ export default {
   realpathSync,
   renameSync,
   statSync,
+  write,
   writeSync,
 };
