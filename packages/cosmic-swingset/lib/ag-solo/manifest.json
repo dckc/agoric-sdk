@@ -17,12 +17,9 @@
     "main": "../../bin/ag-solo-xs",
     "xs-node-global/*": "../xs-node-global/*",
 
-    "workspace/node_modules/@agoric/swingset-vat/src/bundles/kernel": "../../../SwingSet/src/kernel-resource",
+    "workspace/packages/SwingSet/src/bundles/kernel": "../../../SwingSet/src/kernel-resource",
 
-    "moddable-sdk/_MAKEDIR": "/dev/null",
-    "moddable-sdk/files/_MAKEDIR": "/dev/null",
-    "moddable-sdk/data/_MAKEDIR": "/dev/null",
-    "moddable-sdk/files/file/*": [ "$(MODULES)/files/file/*", "$(MODULES)/files/file/lin/*" ],
+    "modules/files/file/*": [ "$(MODULES)/files/file/*", "$(MODULES)/files/file/lin/*" ],
     "*":  [
       "$(MODULES)/data/base64/*",
       "$(MODULES)/data/logical/*",
