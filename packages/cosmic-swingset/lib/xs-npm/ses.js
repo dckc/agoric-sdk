@@ -2,6 +2,12 @@
 
 import harden from '@agoric/harden';
 import Nat from '@agoric/nat';
+import {
+  evaluateExpr,
+  evaluateModule,
+  evaluateProgram,
+  makeEvaluators,
+} from '@agoric/evaluate';
 
 const DEBUG_FLAG = false;
 const DEBUG = (...args) => {
@@ -10,45 +16,6 @@ const DEBUG = (...args) => {
   }
 };
 
-export function evaluateExpr(expr, endowments) {
-  DEBUG(
-    'evaluateExpr endowments:',
-    JSON.stringify(Object.entries(endowments).map(([k, v]) => [k, typeof v])),
-  );
-  // ISSUE: check that params are valid identifiers
-  const params = Object.keys(endowments || {}).join(', ');
-  const wrap = `(function ({${params}}) { return ${expr}; })`;
-  let f;
-  try {
-    f = (1, eval)(wrap);
-  } catch (oops) {
-    DEBUG('eval wrap failed:', oops.message, wrap);
-    throw oops;
-  }
-  const out = f(endowments);
-  DEBUG('evaluateExpr =>', typeof out);
-  return out;
-}
-
-function evaluateProgram(src, endowments) {
-  return evaluateExpr(`(() => { ${src} })()`, endowments);
-}
-
-function evaluateModule(src, endowments) {
-  throw '@@TODO!';
-}
-
-function makeEvaluators(options) {
-  if (Object.keys(options).length > 0) {
-    console.log('WARNING: not implemented:', Object.keys(options));
-  }
-
-  return harden({
-    evaluateExpr,
-    evaluateProgram,
-    evaluateModule,
-  });
-}
 
 function agRequire(modSpec) {
   DEBUG(`agRequire(${modSpec})\n`);
@@ -102,10 +69,11 @@ export function makeSESRootRealm(options) {
   // console.log('makeSESRootRealm', { optionKeys: Object.keys(options) });
   const {
     ses,
+    '@agoric/evaluate': agEval,
     '@agoric/harden': agHarden,
     '@agoric/nat': agNat,
   } = Compartment.map;
-  const map = { ses, '@agoric/harden': agHarden, '@agoric/nat': agNat };
+  const map = { ses, '@agoric/harden': agHarden, '@agoric/nat': agNat, '@agoric/evaluate': agEval };
   const optEndowments = options.consoleMode == 'allow' ? { console } : {};
   const makeCompartment = (...args) =>
     new Compartment('ses', { ...optEndowments, SES }, map);
@@ -123,4 +91,5 @@ export function makeSESRootRealm(options) {
   return realm;
 }
 
+export { evaluateExpr };
 export default SES;
