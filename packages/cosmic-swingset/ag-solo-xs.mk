@@ -24,7 +24,7 @@ debug-lite: ../SwingSet/src/bundles/mailbox-src.js $(BASEDIR)/vats/bootstrap-src
 	mkdir -p $(BUILD)
 	cd lib/ag-solo; mcconfig -o ../../build -d -m manifest.json
 
-lib/ag-solo/xs-compartments.json: $(SOURCES)
+lib/ag-solo/xs-compartments.json: lib/ag-solo/manifest.json
 	cd lib/ag-solo; XS_NPM=../xs-npm XS_NODE_API=../xs-node-api node -r esm $(TAPE_XS)/bin/modlinks.js $(WORKSPACE) main.js
 
 ### rest of the makefile is not recently tested
