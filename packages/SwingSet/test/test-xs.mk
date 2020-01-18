@@ -19,10 +19,12 @@ test: build/bin/lin/release/test bundled-vats genesis-bundles ./demo
 
 MANIFEST=manifest.json
 
-build/bin/lin/release/test: build $(MANIFEST) xs-compartments.json xs-main.js $(SOURCES)
+build/bin/lin/release/test: build $(MANIFEST) xs-compartments.json xs-main.js $(SOURCES) \
+		$(XS_NPM)/tape-promise $(XS_NPM)/tape.js
 	mcconfig -o build -p x-cli-lin -m $(MANIFEST)
 
-build/bin/lin/debug/test: build $(MANIFEST) xs-compartments.json xs-main.js $(SOURCES)
+build/bin/lin/debug/test: build $(MANIFEST) xs-compartments.json xs-main.js $(SOURCES) \
+		$(XS_NPM)/tape-promise $(XS_NPM)/tape.js
 	mcconfig -o build -d -p x-cli-lin -m $(MANIFEST)
 
 # run in simulator and xsbug
