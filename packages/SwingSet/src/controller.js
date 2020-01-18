@@ -23,7 +23,7 @@ export function loadBasedir(basedir) {
   const vats = new Map(); // name -> { sourcepath, options }
   const subs = fs.readdirSync(basedir, { withFileTypes: true });
   subs.forEach(dirent => {
-    if (dirent.name.endsWith('~')) {
+    if (dirent.name.endsWith('~') || ['.', '..'].includes(dirent.name)) {
       return;
     }
     if (
