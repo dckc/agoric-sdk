@@ -38,7 +38,7 @@
     "@agoric.timer-src": "../../../SwingSet/src/bundles/timer-src",
     "@agoric.comms": "../../../SwingSet/src/bundles/vat_comms-src",
     "@agoric.vattp": "../../../SwingSet/src/bundles/vat_vattp-src",
-    "@agoric.vat-timerWrapper": "../../../SwingSet/src/bundles/vat_timer-src",
+    "@agoric.vat-timerWrapper": "../../../SwingSet/src/bundles/vat_timerWrapper-src",
     "xs-compartments": "./xs-compartments"
   }
 }

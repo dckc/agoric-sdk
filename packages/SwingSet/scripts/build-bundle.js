@@ -31,7 +31,7 @@ async function main(argv, pkg, { open, rollup, resolvePlugin, pathResolve }) {
     for (const [vat, src] of [
       ['vattp', 'vat-tp'],
       ['comms', 'comms/index'],
-      ['timer', 'vat-timerWrapper'],
+      ['timerWrapper', 'vat-timerWrapper'],
     ]) {
       const [startFilename, dest] = [
         `${pkg}/src/vats/${src}.js`,
