@@ -18,6 +18,11 @@ const native = {
 
 const lib = 'workspace/packages/cosmic-swingset/lib';
 
+function require(specifier) {
+  throw new Error(`unsupported: require(${specifier})`);
+}
+require.resolve = specifier => specifier;
+
 export default async function main() {
   console.log(`in bin/ag-solo-xs...`);
 
