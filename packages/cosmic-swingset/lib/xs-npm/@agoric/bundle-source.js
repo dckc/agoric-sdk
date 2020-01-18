@@ -27,9 +27,9 @@ function mangleName(path) {
   } else if (path.match(/\/bootstrap.js$/)) {
     bundlePath = `${butLast(path)}bootstrap-src.js`;
   } else {
-    throw new Error(`expected vat-NAME.js; got: ${path}`);
+    throw new Error(`bundle-source expected vat-NAME.js; got: ${path}`);
   }
-  console.log(`=== bundleSource ${path} -> ${bundlePath}`);
+  console.log(`= xs bundleSource ${path} -> ${bundlePath}`);
   return bundlePath;
 }
 
@@ -41,8 +41,7 @@ export default function bundleSource(path) {
     const vatROM = new Resource(resName);
     vatModText = String.fromArrayBuffer(vatROM.slice(0));
   } else {
-    const bundlePath = mangleName(path);
-    vatModText = fs.readFileSync(bundlePath);
+    vatModText = fs.readFileSync(mangleName(path));
   }
 
   const vatExpr = vatModText.slice('export default '.length);
