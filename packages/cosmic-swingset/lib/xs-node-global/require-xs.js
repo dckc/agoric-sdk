@@ -1,45 +1,44 @@
 /* global globalThis, Compartment */
 const harden = x => Object.freeze(x, true);
 
-function ltrim(text, prefix) {
-  if (text.startsWith(prefix)) {
-    text = text.slice(prefix.length);
+// ISSUE: duplicated from bundle-source.js
+function butLast(p) {
+  const pos = p.lastIndexOf('/');
+  return pos >= 0 ? p.slice(0, pos + 1) : p;
+}
+
+// ISSUE: duplicated from bundle-source.js
+function mangleName(path) {
+  let bundlePath;
+  const parts = path.match(/\bvat(-)([^\.]+)(\.js)?$/);
+  if (parts) {
+    bundlePath = `${butLast(path)}vat_${parts[2]}-src.js`;
+  } else if (path.match(/\/bootstrap.js$/)) {
+    bundlePath = `${butLast(path)}bootstrap-src.js`;
+  } else {
+    throw new Error(`expected vat-NAME.js; got: ${path}`);
   }
-  return text;
+  console.log(`==@@ require.resolve ${path} -> ${bundlePath}`);
+  return bundlePath;
 }
 
-function rtrim(text, suffix) {
-  if (text.endsWith(suffix)) {
-    text = text.slice(0, -suffix.length);
+function resolve(specifier) {
+  console.warn('require.resolve on xs is a noop:', specifier);
+  return specifier;
+}
+
+
+export function makeRequire(files, globals, modMap, root='ses') {
+  function require(specifier) {
+    if (specifier === '@agoric/harden') {
+      return { default: harden };
+    }
+    const modText = files.resolve(mangleName(specifier)).readFileSync();
+    const modExpr = modText.slice('export default '.length);
+    const c = new Compartment(root, { require, ...globals }, modMap);
+    const getExport = c.export.evaluateExpr(modExpr, {});
+    return getExport();
   }
-  return text;
+  require.resolve = resolve;
+  return harden(require);
 }
-
-// require() for pre-compiled modules
-export function require(specifier) {
-  console.warn(
-    `require(${specifier}): xs approach is limited to pre-compiled modules`,
-  );
-
-  // Turn specifiers back into what xs manifest expects.
-  const modName = rtrim(ltrim(specifier, './'), '.js');
-
-  function pureModule(name) {
-    return name === '@agoric/harden';
-  }
-
-  const c = new Compartment(
-    modName,
-    { console },
-    Object.fromEntries(Object.entries(Compartment.map).filter(pureModule)),
-  );
-  return c.export;
-}
-
-function resolve(path) {
-  console.log(`require.resolve(${path}): xs stub is a noop.`);
-  return path;
-}
-require.resolve = resolve;
-
-globalThis.require = harden(require);

@@ -18,26 +18,32 @@ ISSUE: The 'Resource' specifier should be more like
 import harden from 'xs_npm/@agoric/harden'; // eslint-disable-line import/no-unresolved
 // tape work-alike in ESM form
 import tape from 'xs_npm/tape-promise/tape'; // eslint-disable-line import/no-unresolved
+
 // moddable-sdk API to access compile-time data
 import Resource from 'Resource'; // eslint-disable-line import/no-unresolved
+import { File, Iterator } from 'modules/files/file/file';
 
-// Test scripts expect various nodejs style globals. See xs-node-global/console.js etc.
-const nodeGlobalStubs = { require, __dirname: './' };
-const nodeGlobals = harden({ console, setImmediate, setTimeout, ...nodeGlobalStubs });
+import { makePath } from 'xs_node_api/pathlib';
+import { makeRequire } from 'xs-node-global/require-xs';
+
+const native = {
+  // references from agoric code
+  'moddable-sdk/files/resource/Resource': 'Resource',
+  // bare specifiers in moddable-sdk files
+  socket: 'socket',
+};
 
 // modlinks produces a map from compartment-internal specifiers
 // to "external" specifiers in the main compartment's map.
 const lookup = ([internal, external]) => [internal, Compartment.map[external]];
-const link = (info, endowments) =>
-  new Compartment(
-    info.root,
-    endowments,
-    Object.fromEntries(Object.entries(info.compartment).map(lookup)),
-  );
+const link = info => Object.fromEntries(Object.entries(info.compartment).map(lookup));
 
-async function runTestScripts(htest) {
+async function runTestScripts(htest, files) {
   const compartmentsROM = new Resource('xs-compartments.json').slice(0);
   const compartments = JSON.parse(String.fromArrayBuffer(compartmentsROM));
+
+  // Test scripts expect various nodejs style globals. See xs-node-global/console.js etc.
+  const nodeGlobals = { console, setImmediate, setTimeout, __dirname: './' };
 
   let summary;
   for (const info of compartments.compartments) {
@@ -46,7 +52,12 @@ async function runTestScripts(htest) {
     // Run the test script (info.root) in its own compartment.
     htest.reset();
     try {
-      link(info, nodeGlobals);
+      const modMap = link(info, nodeGlobals);
+      for (const [internal, external] of Object.entries(native)) {
+	modMap[internal] = Compartment.map[external];
+      }
+      const require = makeRequire(files, nodeGlobals, modMap);
+      new Compartment(info.root, { require, ...nodeGlobals }, modMap);
     } catch (oops) {
       console.log(info.root, 'failed:', oops.message);
       throw oops;
@@ -63,14 +74,15 @@ async function runTestScripts(htest) {
 }
 
 export default async function main() {
-  console.log('\n====== agoric-sdk test main()');
+  console.log('\n====== SwingSet/test main()');
 
   // We use preloading to share tape's main harness.
   // ISSUE: tape harness is global mutable state.
   const htest = tape.createHarness('SwingSet');
+  const files = makePath('.', { File, Iterator });
 
   try {
-    await runTestScripts(htest);
+    await runTestScripts(htest, files);
   } catch (oops) {
     console.error(oops.message);
     throw(oops);

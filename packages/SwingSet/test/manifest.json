@@ -21,9 +21,19 @@
     "moddable-sdk/files/_MAKEDIR": "$(MODULES)/files/_MAKEDIR",
     "moddable-sdk/files/file/*": [ "$(MODULES)/files/file/*", "$(MODULES)/files/file/lin/*" ],
     "moddable-sdk/files/resource/*": [ "$(MODULES)/files/resource/*" ],
+
+    "workspace/packages/SwingSet/src/bundles/kernel": "../src/kernel-resource",
+
     "xs-node-global/*": "$(WORKSPACE)/packages/cosmic-swingset/lib/xs-node-global/*"
   },
   "data": {
+    "agoric.kernel.js": "../src/bundles/kernel",
+    "@agoric.mailbox-src": "../src/bundles/mailbox-src",
+    "@agoric.command-src": "../src/bundles/command-src",
+    "@agoric.timer-src": "../src/bundles/timer-src",
+    "@agoric.comms": "../src/bundles/vat_comms-src",
+    "@agoric.vattp": "../src/bundles/vat_vattp-src",
+    "@agoric.vat-timerWrapper": "../src/bundles/vat_timer-src",
     "xs-compartments": "./xs-compartments"
   }
 }
