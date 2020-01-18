@@ -47,3 +47,5 @@ export function makeEvaluators(options) {
     evaluateModule,
   });
 }
+
+export default { evaluateExpr, evaluateProgram, evaluateModule, makeEvaluators };
