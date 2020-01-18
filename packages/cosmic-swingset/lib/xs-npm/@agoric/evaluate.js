@@ -7,7 +7,7 @@ const DEBUG = (...args) => {
   }
 };
 
-export function evaluateExpr(expr, endowments) {
+export function evaluateExpr(expr, endowments = {}) {
   DEBUG(
     'evaluateExpr endowments:',
     JSON.stringify(Object.entries(endowments).map(([k, v]) => [k, typeof v])),
@@ -27,16 +27,16 @@ export function evaluateExpr(expr, endowments) {
   return out;
 }
 
-export function evaluateProgram(src, endowments) {
+export function evaluateProgram(src, endowments = {}) {
   console.warn('TODO: how to get the result of a program?');
   return evaluateExpr(src, endowments);
 }
 
-export function evaluateModule(src, endowments) {
+export function evaluateModule(src, endowments = {}) {
   throw '@@TODO!';
 }
 
-export function makeEvaluators(options) {
+export function makeEvaluators(options = {}) {
   if (Object.keys(options).length > 0) {
     console.log('WARNING: not implemented:', Object.keys(options));
   }
@@ -48,4 +48,4 @@ export function makeEvaluators(options) {
   });
 }
 
-export default { evaluateExpr, evaluateProgram, evaluateModule, makeEvaluators };
+export default evaluateExpr;

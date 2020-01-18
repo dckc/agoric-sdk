@@ -21,17 +21,11 @@ function agRequire(modSpec) {
   DEBUG(`agRequire(${modSpec})\n`);
   switch (modSpec) {
     case '@agoric/harden':
-      return harden({ default: harden });
+      return harden;
     case '@agoric/nat':
-      return harden({ default: Nat });
+      return Nat;
     case '@agoric/evaluate':
-      return harden({
-        default: evaluateExpr,
-        evaluateExpr,
-        evaluateProgram,
-        evaluateModule,
-        makeEvaluators,
-      });
+      return evaluateExpr;
     default:
       throw 'bad module or something?';
   }
