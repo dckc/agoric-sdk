@@ -26,12 +26,14 @@ import { File, Iterator } from 'modules/files/file/file';
 import { makePath } from 'xs_node_api/pathlib';
 import { makeRequire } from 'xs-node-global/require-xs';
 
-const native = {
+const native = harden({
   // references from agoric code
   'moddable-sdk/files/resource/Resource': 'Resource',
   // bare specifiers in moddable-sdk files
   socket: 'socket',
-};
+});
+
+const process = harden({ version: "10.0-moddable-xs" });
 
 // modlinks produces a map from compartment-internal specifiers
 // to "external" specifiers in the main compartment's map.
@@ -43,11 +45,27 @@ async function runTestScripts(htest, files) {
   const compartments = JSON.parse(String.fromArrayBuffer(compartmentsROM));
 
   // Test scripts expect various nodejs style globals. See xs-node-global/console.js etc.
-  const nodeGlobals = { console, setImmediate, setTimeout, __dirname: './' };
+  const nodeGlobals = { console, setImmediate, setTimeout, process, __dirname: './' };
 
   let summary;
   for (const info of compartments.compartments) {
     console.log('== test compartment =>', info.root);
+    if ('workspace/packages/SwingSet/test/test-demos-comms' === info.root) {
+      console.error('build-bundle.js does not grok ~. yet');
+      continue;
+    } else if (['workspace/packages/SwingSet/test/test-queue-priority',
+		'workspace/packages/SwingSet/test/test-node-version'].includes(info.root)) {
+      console.error('see queue priority issue https://github.com/Agoric/agoric-sdk/issues/45');
+      continue;
+    } else if ([
+      'workspace/packages/SwingSet/test/timer-device/test-device',
+      'workspace/packages/SwingSet/test/test-devices',
+      'workspace/packages/SwingSet/test/test-message-patterns',
+      'workspace/packages/SwingSet/test/test-vattp',
+    ].includes(info.root)) {
+      console.error('test bundling WIP');
+      continue;
+    }
 
     // Run the test script (info.root) in its own compartment.
     htest.reset();
