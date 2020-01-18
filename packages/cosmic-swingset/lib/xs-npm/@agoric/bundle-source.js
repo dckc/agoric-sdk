@@ -5,12 +5,13 @@ import Resource from 'moddable-sdk/files/resource/Resource';
 import fs from 'fs'; // beware: powerful!
 
 const genesisVats = {
-  './vats/vat-tp': '@agoric.vattp.js',
   './mailbox-src': '@agoric.mailbox-src.js',
   './command-src': '@agoric.command-src.js',
   './timer-src': '@agoric.timer-src.js',
+  './loopbox-src': '@agoric.loopbox-src.js',
   './vats/comms': '@agoric.comms.js',
   './vats/vat-timerWrapper': '@agoric.vat-timerWrapper.js',
+  './vats/vat-tp': '@agoric.vattp.js',
 };
 
 function butLast(p) {

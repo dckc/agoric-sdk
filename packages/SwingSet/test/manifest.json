@@ -27,13 +27,14 @@
     "xs-node-global/*": "$(WORKSPACE)/packages/cosmic-swingset/lib/xs-node-global/*"
   },
   "data": {
-    "agoric.kernel.js": "../src/bundles/kernel",
+    "agoric.kernel": "../src/bundles/kernel",
     "@agoric.mailbox-src": "../src/bundles/mailbox-src",
     "@agoric.command-src": "../src/bundles/command-src",
     "@agoric.timer-src": "../src/bundles/timer-src",
+    "@agoric.loopbox-src": "../src/bundles/loopbox-src",
     "@agoric.comms": "../src/bundles/vat_comms-src",
     "@agoric.vattp": "../src/bundles/vat_vattp-src",
-    "@agoric.vat-timerWrapper": "../src/bundles/vat_timer-src",
+    "@agoric.vat-timerWrapper": "../src/bundles/vat_timerWrapper-src",
     "xs-compartments": "./xs-compartments"
   }
 }
