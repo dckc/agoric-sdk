@@ -18,24 +18,26 @@ jobs:
       run: yarn install
     - name: yarn build
       run: yarn build
-    - name: install moddable linux CLI SDK v0.1.12-ag
+    - name: install moddable linux CLI SDK v0.1.15-ag
       run: |
         cd $HOME
-        curl -L https://github.com/dckc/moddable/releases/download/v0.1.12-ag/moddable-linux-sdk.tgz | tar xzf -
-    - name: install tape-xs v0.1.2
+        curl -L https://github.com/dckc/moddable/releases/download/v0.1.15-ag/moddable-linux-sdk.tgz | tar xzf -
+    - name: install tape-xs v0.1.3
       # ISSUE: merge into agoric-sdk?
       run: |
         cd $HOME
-        curl -L https://github.com/dckc/tape-xs/archive/v0.1.2.tar.gz | tar xzf -
-        mv tape-xs-0.1.2 tape-xs
+        curl -L https://github.com/dckc/tape-xs/archive/v0.1.3.tar.gz | tar xzf -
+        mv tape-xs-0.1.3 tape-xs
         cd tape-xs
         yarn install
-    - name: test eventual-send, marshal, captp packages on xs
+    - name: run (most) SwingSet tests
       run: |
         export MODDABLE=$HOME/moddable
+        export WORKSPACE=$GITHUB_WORKSPACE
         export PATH=$MODDABLE/build/bin/lin/release:$PATH
         export TAPE=$HOME/tape-xs
-        make -f test-xs.mk test
+        cd packages/SwingSet/test
+        make -f test-xs.mk
     - name: build ag-solo for xs
       run: |
         export MODDABLE=$HOME/moddable

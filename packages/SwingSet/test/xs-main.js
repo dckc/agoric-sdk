@@ -21,10 +21,10 @@ import tape from 'xs_npm/tape-promise/tape'; // eslint-disable-line import/no-un
 
 // moddable-sdk API to access compile-time data
 import Resource from 'Resource'; // eslint-disable-line import/no-unresolved
-import { File, Iterator } from 'modules/files/file/file';
+import { File, Iterator } from 'modules/files/file/file'; // eslint-disable-line import/no-unresolved
 
-import { makePath } from 'xs_node_api/pathlib';
-import { makeRequire } from 'xs-node-global/require-xs';
+import { makePath } from 'xs_node_api/pathlib'; // eslint-disable-line import/no-unresolved
+import { makeRequire } from 'xs-node-global/require-xs'; // eslint-disable-line import/no-unresolved
 
 const native = harden({
   // references from agoric code
@@ -33,38 +33,54 @@ const native = harden({
   socket: 'socket',
 });
 
-const process = harden({ version: "10.0-moddable-xs" });
+const process = harden({ version: '10.0-moddable-xs' });
 
 // modlinks produces a map from compartment-internal specifiers
 // to "external" specifiers in the main compartment's map.
 const lookup = ([internal, external]) => [internal, Compartment.map[external]];
-const link = info => Object.fromEntries(Object.entries(info.compartment).map(lookup));
+const link = info =>
+  Object.fromEntries(Object.entries(info.compartment).map(lookup));
 
 async function runTestScripts(htest, files) {
   const compartmentsROM = new Resource('xs-compartments.json').slice(0);
   const compartments = JSON.parse(String.fromArrayBuffer(compartmentsROM));
 
   // Test scripts expect various nodejs style globals. See xs-node-global/console.js etc.
-  const nodeGlobals = { console, setImmediate, setTimeout, process, __dirname: './' };
+  const nodeGlobals = {
+    console,
+    setImmediate,
+    setTimeout,
+    process,
+    __dirname: './',
+  };
 
   let summary;
   for (const info of compartments.compartments) {
     console.log('== test compartment =>', info.root);
-    if ('workspace/packages/SwingSet/test/test-demos-comms' === info.root) {
+    if (info.root === 'workspace/packages/SwingSet/test/test-demos-comms') {
       console.error('build-bundle.js does not grok ~. yet');
-      continue;
-    } else if (['workspace/packages/SwingSet/test/test-queue-priority',
-		'workspace/packages/SwingSet/test/test-node-version'].includes(info.root)) {
-      console.error('see queue priority issue https://github.com/Agoric/agoric-sdk/issues/45');
-      continue;
-    } else if ([
-      'workspace/packages/SwingSet/test/timer-device/test-device',
-      'workspace/packages/SwingSet/test/test-devices',
-      'workspace/packages/SwingSet/test/test-message-patterns',
-      'workspace/packages/SwingSet/test/test-vattp',
-    ].includes(info.root)) {
+      continue; // eslint-disable-line no-continue
+    } else if (
+      [
+        'workspace/packages/SwingSet/test/test-queue-priority',
+        'workspace/packages/SwingSet/test/test-node-version',
+      ].includes(info.root)
+    ) {
+      console.error(
+        'see queue priority issue https://github.com/Agoric/agoric-sdk/issues/45',
+      );
+      continue; // eslint-disable-line no-continue
+    } else if (
+      [
+	'workspace/packages/SwingSet/test/test-demos',
+        'workspace/packages/SwingSet/test/timer-device/test-device',
+        'workspace/packages/SwingSet/test/test-devices',
+        'workspace/packages/SwingSet/test/test-message-patterns',
+        'workspace/packages/SwingSet/test/test-vattp',
+      ].includes(info.root)
+    ) {
       console.error('test bundling WIP');
-      continue;
+      continue; // eslint-disable-line no-continue
     }
 
     // Run the test script (info.root) in its own compartment.
@@ -72,16 +88,17 @@ async function runTestScripts(htest, files) {
     try {
       const modMap = link(info, nodeGlobals);
       for (const [internal, external] of Object.entries(native)) {
-	modMap[internal] = Compartment.map[external];
+        modMap[internal] = Compartment.map[external];
       }
       const require = makeRequire(files, nodeGlobals, modMap);
+      // eslint-disable-next-line no-new
       new Compartment(info.root, { require, ...nodeGlobals }, modMap);
     } catch (oops) {
       console.log(info.root, 'failed:', oops.message);
       throw oops;
     }
 
-    summary = await htest.result();
+    summary = await htest.result(); // eslint-disable-line no-await-in-loop
     console.log('== results:', info.root, summary);
   }
 
@@ -103,6 +120,6 @@ export default async function main() {
     await runTestScripts(htest, files);
   } catch (oops) {
     console.error(oops.message);
-    throw(oops);
+    throw oops;
   }
 }
