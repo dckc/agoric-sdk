@@ -34,7 +34,7 @@ export default async function main() {
   for (const [internal, external] of Object.entries(native)) {
     cmap[internal] = Compartment.map[external];
   }
-  const endowments = { console, require, setImmediate, setInterval, URL };
+  const endowments = { console, require, setImmediate, setInterval, setTimeout, URL };
 
   try {
     // console.log('making compartment...');

@@ -9,19 +9,18 @@ export function makePathAccess(path) {
   return makePath(path, { File, Iterator });
 }
 
+const mkp = makePathAccess;
+
 function readFileSync(path) {
-  const p = makePath(path, { File, Iterator });
-  return p.readFileSync();
+  return mkp(path).readFileSync();
 }
 
-function readdirSync(path) {
-  const p = makePath(path, { File, Iterator });
-  return p.readdirSync();
+function readdirSync(path, options) {
+  return mkp(path).readdirSync(options);
 }
 
 function statSync(path) {
-  const p = makePath(path, { File, Iterator });
-  return p.statSync();
+  return mkp(path).statSync();
 }
 
 export function realpathSync(path) {
@@ -59,26 +58,36 @@ const openFiles = (() => {
 })();
 
 function later(thunk) {
-  Promise.resolve(null).then(thunk);
+  return new Promise((resolve, reject) => {
+    try {
+      resolve(thunk());
+    } catch (err) {
+      reject(err);
+    }
+  });
 }
 
 const promises = harden({
+  readFile(path) {
+    return mkp(path).readFile();
+  },
+  writeFile(file, data) {
+    return mkp(file).writeFile(data);
+  },
   write(fd, text) {
-    later(() => {
-      openFiles.lookup(fd).write(text);
-    });
+    return later(() => openFiles.lookup(fd).write(text));
   },
   close(fd) {
-    later(() => openFiles.close(fd));
+    return later(() => openFiles.close(fd));
   },
   readdir(path) {
-    return makePath(path, { File, Iterator }).readdir();
+    return mkp(path).readdir();
   },
   rename(from, to) {
-    later(() => File.rename(from, to));
+    return later(() => File.rename(from, to));
   },
   unlink(path) {
-    later(() => File.delete(path));
+    return later(() => File.delete(path));
   },
 });
 
@@ -97,6 +106,7 @@ export function openSync(path, mode = 'r') {
       throw new Error('already exists');
     } catch (_doesNotExist) {
       // ok
+      // ISSUE: need to distinguish doesNotExist from no permission etc.?
     }
     return openFiles.add(path, true);
   }

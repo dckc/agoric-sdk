@@ -33,6 +33,16 @@ export function join(...paths) {
   return normalize(paths.join('/'));
 }
 
+function later(thunk) {
+  return new Promise((resolve, reject) => {
+    try {
+      resolve(thunk());
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
 export function makePath(filename, { File, Iterator }) {
   const mk = there => makePath(there, { File, Iterator });
 
@@ -74,46 +84,37 @@ export function makePath(filename, { File, Iterator }) {
   }
 
   function atomicReplace(contents) {
-    return new Promise((resolve, reject) => {
-      try {
-        const tmp = mk(`${filename}.tmp`);
-        const tmpF = new File(tmp, true);
-        tmpF.write(contents);
-        tmpF.close();
-        File.rename(tmp, filename);
-      } catch (oops) {
-        reject(oops);
-        return;
-      }
-      resolve();
+    return later(() => {
+      const tmp = mk(`${filename}.tmp`);
+      const tmpF = new File(tmp, true);
+      tmpF.write(contents);
+      tmpF.close();
+      File.rename(tmp, filename);
     });
   }
 
-  function readdirSync(options) {
+  function readdirSync(options = {}) {
     const dirIter = new Iterator(filename);
     let item;
     const items = [];
     while ((item = dirIter.next())) {
-      const f = typeof item.length === 'number';
-      items.push(
-        harden({
-          name: item.name,
-          isFile: () => f,
-        }),
-      );
+      if (options.withFileTypes) {
+        const f = typeof item.length === 'number';
+        items.push(
+          harden({
+            name: item.name,
+            isFile: () => f,
+          }),
+        );
+      } else {
+        items.push(item.name);
+      }
     }
     return items;
   }
 
-  function readdir() {
-    return new Promise((resolve, reject) => {
-      try {
-        const names = readdirSync({}).map(item => item.name);
-        resolve(names);
-      } catch (oops) {
-        reject(oops);
-      }
-    });
+  function readdir(options) {
+    return later(() => readdirSync(options));
   }
 
   function butLast(p) {
@@ -166,6 +167,9 @@ export function makePath(filename, { File, Iterator }) {
     exists,
     statSync,
     readFileSync,
+    readFile() {
+      return later(() => readFileSync());
+    },
     readlinesSync() {
       const text = readFileSync();
       if (text === '') {
@@ -177,6 +181,12 @@ export function makePath(filename, { File, Iterator }) {
     readdir,
     bundleSource,
     atomicReplace,
+    writeFile(data, options) {
+      return later(() => {
+        const f = new File(filename, true);
+        f.write(data);
+      });
+    },
     withWriting,
   });
 }
