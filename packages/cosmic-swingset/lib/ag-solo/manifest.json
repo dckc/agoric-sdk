@@ -32,7 +32,7 @@
     ],
   },
   "data": {
-    "agoric.kernel.js": "../../../SwingSet/src/bundles/kernel",
+    "agoric.kernel": "../../../SwingSet/src/bundles/kernel",
     "@agoric.mailbox-src": "../../../SwingSet/src/bundles/mailbox-src",
     "@agoric.command-src": "../../../SwingSet/src/bundles/command-src",
     "@agoric.timer-src": "../../../SwingSet/src/bundles/timer-src",
