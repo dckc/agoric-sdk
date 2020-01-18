@@ -48,4 +48,12 @@ export function makeEvaluators(options = {}) {
   });
 }
 
+// support both evaluate = require('@agoric/evaluate')
+// and const { makeEvaluators } = require('@agoric/evaluate');
+evaluateExpr.evaluateExpr = evaluateExpr;
+evaluateExpr.evaluateProgram = evaluateProgram;
+evaluateExpr.evaluateModule = evaluateModule;
+evaluateExpr.makeEvaluators = makeEvaluators;
+harden(evaluateExpr);
+
 export default evaluateExpr;
