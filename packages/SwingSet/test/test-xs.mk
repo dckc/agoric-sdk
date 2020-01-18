@@ -46,9 +46,9 @@ xs-compartments.json: manifest.json
 		node -r esm $(TAPE)/bin/modlinks.js $(WORKSPACE) $(TEST_SCRIPTS)
 
 # bundle all the test vats
-bundled-vats: vat_controller-1-src.js ../src/devices/dev_loopbox-src.js
+bundled-vats: vat_controller-1-src.js
 
-vat_controller-1-src.js ../src/devices/dev_loopbox-src.js:
+vat_controller-1-src.js:
 	find .. -type f -name src -prune -o -name 'bootstrap.js' | while read mod; do \
 		bundle=`echo $$mod | perl -pe 's/bootstrap.js/bootstrap-src.js/'`; \
 		$(BUILD_BUNDLE) $$mod $$bundle; \
