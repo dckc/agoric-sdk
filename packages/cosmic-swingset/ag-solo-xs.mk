@@ -6,7 +6,7 @@ export PATH := $(MODDABLE)/build/bin/lin/release:$(PATH)
 PKG=ag-solo
 
 BASEDIR=t3
-SOURCES=bin/ag-solo-xs.js *.js lib/xs-npm/*.js lib/xs-node-global/*.js lib/xs-node-api/*.js lib/ag-solo-todo/*.js
+SOURCES=bin/ag-solo-xs.js lib/ag-solo/*.js lib/xs-npm/*.js lib/xs-npm/@agoric/*.js lib/xs-node-global/*.js lib/xs-node-api/*.js
 BUILD=./build
 
 ./bin/ag-solo-xs: $(BUILD)/bin/lin/release/ag-solo
@@ -50,7 +50,7 @@ vat-device-bundles: ../SwingSet/src/bundles/mailbox-src.js
 	cd lib; XS_NPM=xs-npm XS_NODE_API=xs-node-api node -r esm $(TAPE_XS)/bin/modlinks.js $(WORKSPACE) ag-solo/main.js
 
 clean:
-	-rm -f ./lib/xs-compartments.json
+	-rm -f ./lib/ag-solo/xs-compartments.json
 	-rm -f ./test/xs-compartments.json
 	-rm -rf ./bin/ag-solo-xs
 	-rm -rf $(BASEDIR)
