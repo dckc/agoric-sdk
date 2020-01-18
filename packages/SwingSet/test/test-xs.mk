@@ -1,5 +1,5 @@
-export WORKSPACE=../../..
-TAPE=~/projects/agoric/tape-xs
+# export WORKSPACE=../../..
+# TAPE=~/projects/agoric/tape-xs
 
 BUILD_BUNDLE=node -r esm ../scripts/build-bundle.js
 
