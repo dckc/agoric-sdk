@@ -18,6 +18,20 @@ function butLast(p) {
   return pos >= 0 ? p.slice(0, pos + 1) : p;
 }
 
+function mangleName(path) {
+  let bundlePath;
+  const parts = path.match(/vat(-)([^\.]+)(\.js)?$/);
+  if (parts) {
+    bundlePath = `${butLast(path)}vat_${parts[2]}-src.js`;
+  } else if (path.match(/\/bootstrap.js$/)) {
+    bundlePath = `${butLast(path)}bootstrap-src.js`;
+  } else {
+    throw new Error(`expected vat-NAME.js; got: ${path}`);
+  }
+  console.log(`=== bundleSource ${path} -> ${bundlePath}`);
+  return bundlePath;
+}
+
 export default function bundleSource(path) {
   // console.log('bundle-source:', path);
   let vatModText;
@@ -26,16 +40,7 @@ export default function bundleSource(path) {
     const vatROM = new Resource(resName);
     vatModText = String.fromArrayBuffer(vatROM.slice(0));
   } else {
-    let bundlePath;
-    const parts = path.match(/vat(-)([^\.]+).js$/);
-    if (parts) {
-      bundlePath = `${butLast(path)}vat_${parts[2]}-src.js`;
-    } else if (path.match(/\/bootstrap.js$/)) {
-      bundlePath = `${butLast(path)}bootstrap-src.js`;
-    } else {
-      throw new Error(`expected vat-NAME.js; got: ${path}`);
-    }
-    console.log(`=== bundleSource ${path} -> ${bundlePath}`);
+    const bundlePath = mangleName(path);
     vatModText = fs.readFileSync(bundlePath);
   }
 
