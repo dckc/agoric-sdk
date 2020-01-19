@@ -14,7 +14,7 @@ BUILD_BUNDLE=node -r esm $(WORKSPACE)/packages/SwingSet/scripts/build-bundle.js
 	cp $< $@
 
 check-start: ./bin/ag-solo-xs
-	cd $(BASEDIR) && ../bin/ag-solo-xs start --role=three_client
+	cd $(BASEDIR) && ../bin/ag-solo-xs start --role=two_client
 
 $(BUILD)/bin/lin/release/ag-solo: $(SOURCES) ../SwingSet/src/bundles/mailbox-src.js $(BASEDIR)/vats/bootstrap-src.js lib/ag-solo/manifest.json lib/ag-solo/xs-compartments.json
 	mkdir -p $(BUILD)

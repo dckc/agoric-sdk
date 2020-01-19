@@ -41,7 +41,8 @@ export default async function main() {
     const solo = new Compartment(info.root, endowments, cmap).export.default;
     // console.log('got solo from compartment:', solo);
 
-    await solo('ag-solo-xs', ['start']);
+    console.warn('ag-solo-xs: args are hard-coded');
+    await solo('ag-solo-xs', ['start', '--role=two_client']);
     // start should run forever
     await new Promise(() => null);
   } catch (oops) {
