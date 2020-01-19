@@ -72,7 +72,7 @@ async function runTestScripts(htest, files) {
       continue; // eslint-disable-line no-continue
     } else if (
       [
-	'workspace/packages/SwingSet/test/test-demos',
+        'workspace/packages/SwingSet/test/test-demos',
         'workspace/packages/SwingSet/test/timer-device/test-device',
         'workspace/packages/SwingSet/test/test-devices',
         'workspace/packages/SwingSet/test/test-message-patterns',
