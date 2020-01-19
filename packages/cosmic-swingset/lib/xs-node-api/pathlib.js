@@ -122,24 +122,6 @@ export function makePath(filename, { File, Iterator }) {
     return pos >= 0 ? p.slice(0, pos + 1) : p;
   }
 
-  function bundleSource() {
-    let bundlePath;
-    const parts = filename.match(/vat(-)([^\.]+).js$/);
-    if (parts) {
-      bundlePath = `${butLast(filename)}vat_${parts[2]}-src.js`;
-    } else if (filename.match(/\/bootstrap.js$/)) {
-      bundlePath = `${butLast(filename)}bootstrap-src.js`;
-    } else {
-      throw new Error(`expected vat-NAME.js; got: ${filename}`);
-    }
-    console.warn(`bundleSource ${filename} -> ${bundlePath}`);
-    const src = mk(bundlePath).readFileSync();
-    return {
-      source: src.replace(/^export default /, ''),
-      sourceMap: `//# sourceURL=${filename}\n`,
-    };
-  }
-
   function statSync() {
     new File(filename);
     return harden({});
@@ -179,7 +161,6 @@ export function makePath(filename, { File, Iterator }) {
     },
     readdirSync,
     readdir,
-    bundleSource,
     atomicReplace,
     writeFile(data, options) {
       return later(() => {
