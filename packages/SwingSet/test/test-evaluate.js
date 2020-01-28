@@ -1,4 +1,4 @@
-import { test } from 'tape';
+import { test } from 'tape-promise/tape';
 import evaluate from '@agoric/evaluate';
 
 test('basic', t => {

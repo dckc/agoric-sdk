@@ -1,6 +1,6 @@
 import harden from '@agoric/harden';
 import { test } from 'tape-promise/tape';
-import buildCommsDispatch from '../src/vats/comms';
+import buildCommsDispatch from '../src/vats/comms/index';
 import { flipRemoteSlot } from '../src/vats/comms/parseRemoteSlot';
 import { makeState } from '../src/vats/comms/state';
 import { addRemote } from '../src/vats/comms/remote';

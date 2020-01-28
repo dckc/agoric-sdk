@@ -18,12 +18,23 @@ import { insistCapData } from './capdata';
 import { parseVatSlot } from './parseVatSlots';
 import { buildStorageInMemory } from './hostStorage';
 
+function byName(a, b) {
+  if (a.name < b.name) {
+    return -1;
+  }
+  if (a.name > b.name) {
+    return 1;
+  }
+  return 0;
+}
+
 export function loadBasedir(basedir) {
   console.log(`= loading config from basedir ${basedir}`);
   const vats = new Map(); // name -> { sourcepath, options }
   const subs = fs.readdirSync(basedir, { withFileTypes: true });
+  subs.sort(byName);
   subs.forEach(dirent => {
-    if (dirent.name.endsWith('~')) {
+    if (dirent.name.endsWith('~') || ['.', '..'].includes(dirent.name)) {
       return;
     }
     if (

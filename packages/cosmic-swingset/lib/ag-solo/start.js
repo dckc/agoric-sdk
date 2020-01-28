@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import temp from 'temp';
-import { promisify } from 'util';
 import readlines from 'n-readlines';
 // import { createHash } from 'crypto';
 
@@ -34,10 +33,21 @@ import bundle from './bundle';
 
 const CONTRACT_REGEXP = /^((zoe|contractHost)-([^.]+))/;
 
-const fsWrite = promisify(fs.write);
-const fsClose = promisify(fs.close);
-const rename = promisify(fs.rename);
-const unlink = promisify(fs.unlink);
+const { rename, unlink } = fs.promises;
+
+function asPromise(calling) {
+  return new Promise((resolve, reject) => {
+    calling((err, result) => {
+      if (err) {
+	reject(err);
+      } else {
+	resolve(result);
+      }
+    });
+  });
+}
+const fsWrite = (fd, buf) => asPromise(cb => fs.write(fd, buf, cb));
+const fsClose = (fd) => asPromise(cb => fs.close(fd, cb));
 
 async function atomicReplaceFile(filename, contents) {
   const info = await new Promise((resolve, reject) => {
@@ -78,7 +88,7 @@ async function buildSwingset(
   vatsDir,
   argv,
   broadcast,
-  ) {
+) {
   const initialMailboxState = JSON.parse(fs.readFileSync(mailboxStateFile));
 
   const mbs = buildMailboxStateMap();
@@ -120,7 +130,7 @@ async function buildSwingset(
     const tmpfn = `${kernelStateFile}.tmp`;
     const fd = fs.openSync(tmpfn, 'w');
 
-    for (let [key, value] of storage.map.entries()) {
+    for (const [key, value] of storage.map.entries()) {
       const line = JSON.stringify([key, value]);
       fs.writeSync(fd, line);
       fs.writeSync(fd, '\n');
@@ -183,7 +193,10 @@ async function buildSwingset(
 
 export default async function start(basedir, withSES, argv) {
   const mailboxStateFile = path.resolve(basedir, 'swingset-mailbox-state.json');
-  const kernelStateFile = path.resolve(basedir, 'swingset-kernel-state.jsonlines');
+  const kernelStateFile = path.resolve(
+    basedir,
+    'swingset-kernel-state.jsonlines',
+  );
   const connections = JSON.parse(
     fs.readFileSync(path.join(basedir, 'connections.json')),
   );
@@ -274,13 +287,13 @@ export default async function start(basedir, withSES, argv) {
   let list = [];
   try {
     list = await fs.promises.readdir(initDir);
-  } catch (e) {
-
-  }
+  } catch (e) {}
   for (const initName of list.sort()) {
     console.log('loading init bundle', initName);
     const initFile = path.join(initDir, initName);
-    if (await bundle(() => '.', ['--evaluate', '--once', '--input', initFile])) {
+    if (
+      await bundle(() => '.', ['--evaluate', '--once', '--input', initFile])
+    ) {
       return 0;
     }
   }

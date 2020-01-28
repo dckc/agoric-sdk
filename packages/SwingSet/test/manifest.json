@@ -1,0 +1,44 @@
+{
+  "include": [
+    "$(MODDABLE)/examples/manifest_base.json",
+    "xs-compartments.json",
+  ],
+  "creation": {
+    "keys": {
+      "available": 4096
+    },
+    "stack": 4096
+  },
+  "strip": [],
+  "preload": [
+    "xs-node-global/*",
+    "main",
+    "xs_npm/tape-promise/tape"
+  ],
+  "modules": {
+    "main": "./xs-main",
+    "*": [
+      "$(MODULES)/base/timer/timer",
+      "$(MODULES)/base/timer/lin/*",
+    ],
+    "moddable-sdk/_MAKEDIR": "$(MODULES)/_MAKEDIR",
+    "moddable-sdk/files/_MAKEDIR": "$(MODULES)/files/_MAKEDIR",
+    "moddable-sdk/files/file/*": [ "$(MODULES)/files/file/*", "$(MODULES)/files/file/lin/*" ],
+    "moddable-sdk/files/resource/*": [ "$(MODULES)/files/resource/*" ],
+
+    "workspace/packages/SwingSet/src/bundles/kernel": "../src/kernel-resource",
+
+    "xs-node-global/*": "$(WORKSPACE)/packages/cosmic-swingset/lib/xs-node-global/*"
+  },
+  "data": {
+    "agoric.kernel": "../src/bundles/kernel",
+    "@agoric.mailbox-src": "../src/bundles/mailbox-src",
+    "@agoric.command-src": "../src/bundles/command-src",
+    "@agoric.timer-src": "../src/bundles/timer-src",
+    "@agoric.loopbox-src": "../src/bundles/loopbox-src",
+    "@agoric.comms": "../src/bundles/vat_comms-src",
+    "@agoric.vattp": "../src/bundles/vat_vattp-src",
+    "@agoric.vat-timerWrapper": "../src/bundles/vat_timerWrapper-src",
+    "xs-compartments": "./xs-compartments"
+  }
+}
