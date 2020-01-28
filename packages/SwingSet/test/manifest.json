@@ -17,6 +17,10 @@
   ],
   "modules": {
     "main": "./xs-main",
+    "*": [
+      "$(MODULES)/base/timer/timer",
+      "$(MODULES)/base/timer/lin/*",
+    ],
     "moddable-sdk/_MAKEDIR": "$(MODULES)/_MAKEDIR",
     "moddable-sdk/files/_MAKEDIR": "$(MODULES)/files/_MAKEDIR",
     "moddable-sdk/files/file/*": [ "$(MODULES)/files/file/*", "$(MODULES)/files/file/lin/*" ],

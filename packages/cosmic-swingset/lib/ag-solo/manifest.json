@@ -24,6 +24,8 @@
 
     "modules/files/file/*": [ "$(MODULES)/files/file/*", "$(MODULES)/files/file/lin/*" ],
     "*":  [
+      "$(MODULES)/base/timer/timer",
+      "$(MODULES)/base/timer/lin/*",
       "$(MODULES)/data/base64/*",
       "$(MODULES)/data/logical/*",
       "$(MODULES)/crypt/digest/*",
