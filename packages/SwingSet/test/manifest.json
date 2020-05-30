@@ -3,6 +3,12 @@
     "$(MODDABLE)/examples/manifest_base.json",
     "xs-compartments.json",
   ],
+  "creation": {
+    "keys": {
+      "available": 4096
+    },
+    "stack": 4096
+  },
   "strip": [],
   "modules": {
     "main": "./xs-main",
@@ -10,5 +16,9 @@
     "moddable-sdk/files/_MAKEDIR": "$(MODULES)/files/_MAKEDIR",
     "moddable-sdk/files/file/*": [ "$(MODULES)/files/file/*", "$(MODULES)/files/file/lin/*" ],
     "moddable-sdk/files/resource/*": [ "$(MODULES)/files/resource/*" ],
+  },
+  "preload": ["xs_npm/@agoric/install-ses"],
+  "data": {
+    "xs-compartments": "./xs-compartments"
   }
 }
