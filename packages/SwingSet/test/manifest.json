@@ -1,0 +1,14 @@
+{
+  "include": [
+    "$(MODDABLE)/examples/manifest_base.json",
+    "xs-compartments.json",
+  ],
+  "strip": [],
+  "modules": {
+    "main": "./xs-main",
+    "moddable-sdk/_MAKEDIR": "$(MODULES)/_MAKEDIR",
+    "moddable-sdk/files/_MAKEDIR": "$(MODULES)/files/_MAKEDIR",
+    "moddable-sdk/files/file/*": [ "$(MODULES)/files/file/*", "$(MODULES)/files/file/lin/*" ],
+    "moddable-sdk/files/resource/*": [ "$(MODULES)/files/resource/*" ],
+  }
+}
