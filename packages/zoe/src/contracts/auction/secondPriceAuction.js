@@ -17,10 +17,11 @@ import '../../../exported';
  * NOT TO BE USED IN PRODUCTION CODE. BIDS ARE PUBLIC. An auction
  * contract in which the seller offers an Asset for sale, and states a
  * minimum price. The auction closes at the deadline specified by the
- * timerAuthority and closesAfter parameters in the terms provided by
+ * timeAuthority and closesAfter parameters in the terms provided by
  * the creator of the contract instance. The second price rule is
  * followed, so the highest bidder pays the amount bid by the second
  * highest bidder.
+ * https://agoric.com/documentation/zoe/guide/contracts/second-price-auction.html
  *
  * startInstance() specifies the issuers and the terms. An invitation
  * for the seller is returned as the creatorInvitation. The seller's
@@ -34,7 +35,7 @@ import '../../../exported';
  * @type {ContractStartFn}
  */
 const start = zcf => {
-  const { timerAuthority, closesAfter } = zcf.getTerms();
+  const { timeAuthority, closesAfter } = zcf.getTerms();
 
   let sellSeat;
   const bidSeats = [];
@@ -42,15 +43,14 @@ const start = zcf => {
   // seller will use 'Asset' and 'Ask'. buyer will use 'Asset' and 'Bid'
   assertIssuerKeywords(zcf, harden(['Asset', 'Ask']));
 
-  /** @type {Timer} */
-  E(timerAuthority)
+  E(timeAuthority)
     .setWakeup(
       closesAfter,
       harden({ wake: () => calcWinnerAndClose(zcf, sellSeat, bidSeats) }),
     )
     .catch(err => {
       console.error(
-        `Could not schedule the close of the auction at the 'closesAfter' deadline ${closesAfter} using this timer ${timerAuthority}`,
+        `Could not schedule the close of the auction at the 'closesAfter' deadline ${closesAfter} using this timer ${timeAuthority}`,
       );
       console.error(err);
       throw err;
@@ -59,39 +59,33 @@ const start = zcf => {
   const makeBidInvitation = () => {
     /** @type {OfferHandler} */
     const performBid = seat => {
+      assertProposalShape(seat, {
+        give: { Bid: null },
+        want: { Asset: null },
+      });
       assertBidSeat(zcf, sellSeat, seat);
       bidSeats.push(seat);
       return defaultAcceptanceMsg;
     };
 
-    const bidExpected = harden({
-      give: { Bid: null },
-      want: { Asset: null },
-    });
-
     const customProperties = harden({
       auctionedAssets: sellSeat.getProposal().give.Asset,
       minimumBid: sellSeat.getProposal().want.Ask,
       closesAfter,
-      timerAuthority,
+      timeAuthority,
     });
 
-    return zcf.makeInvitation(
-      assertProposalShape(performBid, bidExpected),
-      'bid',
-      customProperties,
-    );
+    return zcf.makeInvitation(performBid, 'bid', customProperties);
   };
 
-  const sellExpected = harden({
-    give: { Asset: null },
-    want: { Ask: null },
-    // The auction is not over until the deadline according to the
-    // provided timer. The seller cannot exit beforehand.
-    exit: { waived: null },
-  });
-
   const sell = seat => {
+    assertProposalShape(seat, {
+      give: { Asset: null },
+      want: { Ask: null },
+      // The auction is not over until the deadline according to the
+      // provided timer. The seller cannot exit beforehand.
+      exit: { waived: null },
+    });
     // Save the seat for when the auction closes.
     sellSeat = seat;
 
@@ -100,10 +94,7 @@ const start = zcf => {
     return harden({ makeBidInvitation });
   };
 
-  const creatorInvitation = zcf.makeInvitation(
-    assertProposalShape(sell, sellExpected),
-    'sellAssets',
-  );
+  const creatorInvitation = zcf.makeInvitation(sell, 'sellAssets');
 
   return harden({ creatorInvitation });
 };

@@ -8,7 +8,7 @@ import { makeFixture, E } from './captp-fixture';
 let home;
 let teardown;
 test.before('setup', async t => {
-  const { homeP, kill } = makeFixture();
+  const { homeP, kill } = await makeFixture();
   teardown = kill;
   home = await homeP;
   t.truthy('ready');
@@ -32,10 +32,15 @@ test.serial('home.registry', async t => {
 
 test.serial('home.board', async t => {
   const { board } = E.G(home);
-  t.throwsAsync(
-    () => E(board).getValue('0000000000'),
+  await t.throwsAsync(
+    () => E(board).getValue('148'),
     { message: /board does not have id/ },
     `getting a value for a fake id throws`,
+  );
+  await t.throwsAsync(
+    () => E(board).getValue('0000000000'),
+    { message: /id is probably a typo/ },
+    `using a non-verified id throws`,
   );
 
   const myValue = {};

@@ -35,6 +35,8 @@ harden(an);
  * The current `cycleTolerantStringify` possibly emits too many "seen"
  * markings: Not only for cycles, but also for repeated subtrees by
  * object identity.
+ *
+ * @param {any} payload
  */
 function cycleTolerantStringify(payload) {
   const seenSet = new Set();
@@ -50,7 +52,7 @@ function cycleTolerantStringify(payload) {
   return JSON.stringify(payload, replacer);
 }
 
-const declassifiers = new WeakSet();
+const declassifiers = new WeakMap();
 
 /**
  * To "declassify" and quote a substitution value used in a
@@ -72,7 +74,6 @@ const declassifiers = new WeakSet();
  * ```
  *
  * @typedef {Object} StringablePayload
- * @property {*} payload The original payload
  * @property {() => string} toString How to print the payload
  *
  * @param {*} payload What to declassify
@@ -81,10 +82,9 @@ const declassifiers = new WeakSet();
 function q(payload) {
   // Don't harden the payload
   const result = Object.freeze({
-    payload,
     toString: Object.freeze(() => cycleTolerantStringify(payload)),
   });
-  declassifiers.add(result);
+  declassifiers.set(result, payload);
   return result;
 }
 harden(q);
@@ -138,7 +138,7 @@ function details(template, ...args) {
         let argStr;
         if (declassifiers.has(arg)) {
           argStr = `${arg}`;
-          arg = arg.payload;
+          arg = declassifiers.get(arg);
         } else {
           argStr = `(${an(typeof arg)})`;
         }
@@ -179,8 +179,8 @@ harden(details);
  *
  * The optional `optDetails` can be a string for backwards compatibility
  * with the nodejs assertion library.
+ *
  * @param {Details} [optDetails] The details of what was asserted
- * @returns {never}
  */
 function fail(optDetails = details`Assert failed`) {
   if (typeof optDetails === 'string') {
@@ -191,11 +191,13 @@ function fail(optDetails = details`Assert failed`) {
   throw optDetails.complain();
 }
 
+/* eslint-disable jsdoc/require-returns-check,jsdoc/valid-types */
 /**
  * @param {*} flag The truthy/falsy value
  * @param {Details} [optDetails] The details to throw
  * @returns {asserts flag}
  */
+/* eslint-enable jsdoc/require-returns-check,jsdoc/valid-types */
 function assert(flag, optDetails = details`Check failed`) {
   if (!flag) {
     throw fail(optDetails);
@@ -204,6 +206,7 @@ function assert(flag, optDetails = details`Check failed`) {
 
 /**
  * Assert that two values must be `Object.is`.
+ *
  * @param {*} actual The value we received
  * @param {*} expected What we wanted
  * @param {Details} [optDetails] The details to throw
@@ -219,6 +222,7 @@ function equal(
 
 /**
  * Assert an expected typeof result.
+ *
  * @type {AssertTypeof}
  * @param {any} specimen The value to get the typeof
  * @param {string} typename The expected name
@@ -241,6 +245,7 @@ const assertTypeof = (specimen, typename, optDetails) => {
   equal(typeof specimen, typename, optDetails);
 };
 
+/* eslint-disable jsdoc/valid-types */
 /**
  * assert that expr is truthy, with an optional details to describe
  * the assertion. It is a tagged template literal like
@@ -260,8 +265,10 @@ const assertTypeof = (specimen, typename, optDetails) => {
  *
  * The optional `optDetails` can be a string for backwards compatibility
  * with the nodejs assertion library.
+ *
  * @type {typeof assert & { typeof: AssertTypeof, fail: typeof fail, equal: typeof equal }}
  */
+/* eslint-enable jsdoc/valid-types */
 const assertCombined = Object.assign(assert, {
   equal,
   fail,

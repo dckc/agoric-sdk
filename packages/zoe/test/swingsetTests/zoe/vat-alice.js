@@ -3,10 +3,10 @@ import { makeLocalAmountMath } from '@agoric/ertp';
 import { showPurseBalance, setupIssuers } from '../helpers';
 
 const build = async (log, zoe, issuers, payments, installations, timer) => {
-  const { moola, simoleans, purses } = await setupIssuers(zoe, issuers);
+  const { moola, simoleans, bucks, purses } = await setupIssuers(zoe, issuers);
   const [moolaPurseP, simoleanPurseP] = purses;
-  const [moolaPayment, simoleanPayment] = payments;
-  const [moolaIssuer, simoleanIssuer] = issuers;
+  const [moolaPayment, simoleanPayment, bucksPayment] = payments;
+  const [moolaIssuer, simoleanIssuer, bucksIssuer] = issuers;
 
   const doAutomaticRefund = async bobP => {
     log(`=> alice.doCreateAutomaticRefund called`);
@@ -127,7 +127,7 @@ const build = async (log, zoe, issuers, payments, installations, timer) => {
       Ask: simoleanIssuer,
     });
     const now = await E(timer).getCurrentTimestamp();
-    const terms = harden({ timerAuthority: timer, closesAfter: now + 1 });
+    const terms = harden({ timeAuthority: timer, closesAfter: now + 1 });
     const { creatorInvitation: sellAssetsInvitation } = await E(
       zoe,
     ).startInstance(
@@ -302,8 +302,8 @@ const build = async (log, zoe, issuers, payments, installations, timer) => {
 
   const doAutoswap = async bobP => {
     const issuerKeywordRecord = harden({
-      TokenA: moolaIssuer,
-      TokenB: simoleanIssuer,
+      Central: moolaIssuer,
+      Secondary: simoleanIssuer,
     });
     const { publicFacet, instance } = await E(zoe).startInstance(
       installations.autoswap,
@@ -317,12 +317,12 @@ const build = async (log, zoe, issuers, payments, installations, timer) => {
     // 10 moola = 5 simoleans at the time of the liquidity adding
     // aka 2 moola = 1 simolean
     const addLiquidityProposal = harden({
-      give: { TokenA: moola(10), TokenB: simoleans(5) },
+      give: { Central: moola(10), Secondary: simoleans(5) },
       want: { Liquidity: liquidity(10) },
     });
     const paymentKeywordRecord = harden({
-      TokenA: moolaPayment,
-      TokenB: simoleanPayment,
+      Central: moolaPayment,
+      Secondary: simoleanPayment,
     });
     const addLiquidityInvitation = E(publicFacet).makeAddLiquidityInvitation();
     const addLiqSeatP = await E(zoe).offer(
@@ -343,7 +343,7 @@ const build = async (log, zoe, issuers, payments, installations, timer) => {
     // remove the liquidity
     const aliceRemoveLiquidityProposal = harden({
       give: { Liquidity: liquidity(10) },
-      want: { TokenA: moola(0), TokenB: simoleans(0) },
+      want: { Central: moola(0), Secondary: simoleans(0) },
     });
 
     const liquidityTokenPayment = await E(liquidityTokenPurseP).withdraw(
@@ -361,8 +361,8 @@ const build = async (log, zoe, issuers, payments, installations, timer) => {
 
     log(await E(removeLiquiditySeatP).getOfferResult());
 
-    const moolaPayout = await E(removeLiquiditySeatP).getPayout('TokenA');
-    const simoleanPayout = await E(removeLiquiditySeatP).getPayout('TokenB');
+    const moolaPayout = await E(removeLiquiditySeatP).getPayout('Central');
+    const simoleanPayout = await E(removeLiquiditySeatP).getPayout('Secondary');
 
     await E(moolaPurseP).deposit(moolaPayout);
     await E(simoleanPurseP).deposit(simoleanPayout);
@@ -414,6 +414,71 @@ const build = async (log, zoe, issuers, payments, installations, timer) => {
     const currentPurseBalance = await E(moolaPurseP).getCurrentAmount();
 
     log('alice earned: ', currentPurseBalance);
+  };
+
+  const doOTCDesk = async bobP => {
+    const { creatorFacet } = await E(zoe).startInstance(
+      installations.otcDesk,
+      undefined,
+      { coveredCallInstallation: installations.coveredCall },
+    );
+
+    // Add inventory
+    const addInventoryInvitation = await E(
+      creatorFacet,
+    ).makeAddInventoryInvitation({
+      Moola: moolaIssuer,
+      Simolean: simoleanIssuer,
+      Buck: bucksIssuer,
+    });
+    const addInventoryProposal = harden({
+      give: {
+        Moola: moola(10000),
+        Simolean: simoleans(10000),
+        Buck: bucks(10000),
+      },
+    });
+    const addInventoryPayments = {
+      Moola: moolaPayment,
+      Simolean: simoleanPayment,
+      Buck: bucksPayment,
+    };
+
+    const addInventorySeat = await E(zoe).offer(
+      addInventoryInvitation,
+      addInventoryProposal,
+      addInventoryPayments,
+    );
+    const addInventoryOfferResult = await E(addInventorySeat).getOfferResult();
+    log(addInventoryOfferResult);
+    const bobInvitation = await E(creatorFacet).makeQuote(
+      { Simolean: simoleans(4) },
+      { Moola: moola(3) },
+      timer,
+      1,
+    );
+
+    await E(bobP).doOTCDesk(bobInvitation);
+
+    // Remove Inventory
+    const removeInventoryInvitation = await E(
+      creatorFacet,
+    ).makeRemoveInventoryInvitation();
+    // Intentionally do not remove it all
+    const removeInventoryProposal = harden({
+      want: { Simolean: simoleans(2) },
+    });
+    const removeInventorySeat = await E(zoe).offer(
+      removeInventoryInvitation,
+      removeInventoryProposal,
+    );
+    const removeInventoryOfferResult = await E(
+      removeInventorySeat,
+    ).getOfferResult();
+    log(removeInventoryOfferResult);
+    const simoleanPayout = await E(removeInventorySeat).getPayout('Simolean');
+
+    log(await E(simoleanIssuer).getAmountOf(simoleanPayout));
   };
 
   const doBadTimer = async () => {
@@ -487,6 +552,9 @@ const build = async (log, zoe, issuers, payments, installations, timer) => {
         }
         case 'sellTicketsOk': {
           return doSellTickets(bobP, carolP, daveP);
+        }
+        case 'otcDeskOk': {
+          return doOTCDesk(bobP);
         }
         case 'badTimer': {
           return doBadTimer();

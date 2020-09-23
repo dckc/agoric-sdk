@@ -1,7 +1,6 @@
 import '@agoric/install-metering-and-ses';
 import path from 'path';
 import test from 'ava';
-import { initSwingStore } from '@agoric/swing-store-simple';
 import bundleSource from '@agoric/bundle-source';
 import { buildVatController, loadBasedir } from '../../src';
 
@@ -11,7 +10,6 @@ function nonBundleFunction(_E) {
 
 async function doTestSetup(mode) {
   const config = await loadBasedir(__dirname);
-  config.hostStorage = initSwingStore().storage;
   const newVatBundle = await bundleSource(path.join(__dirname, 'new-vat.js'));
   const brokenVatBundle = await bundleSource(
     path.join(__dirname, 'broken-vat.js'),
@@ -52,7 +50,7 @@ test('error creating vat from non-bundle', async t => {
   await c.run();
   t.deepEqual(c.dump().log, [
     'starting non-bundle test',
-    'yay, rejected: Error: Vat Creation Error: Error: createVatDynamically() requires bundle, not a plain string',
+    'yay, rejected: Error: Vat Creation Error: Error: vat creation requires a bundle, not a plain string',
   ]);
   await c.run();
 });

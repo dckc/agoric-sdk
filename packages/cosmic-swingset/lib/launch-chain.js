@@ -1,13 +1,14 @@
 import path from 'path';
 import anylogger from 'anylogger';
 
-import djson from 'deterministic-json';
 import {
   buildMailbox,
   buildMailboxStateMap,
   buildTimer,
   buildBridge,
-  buildVatController,
+  swingsetIsInitialized,
+  initializeSwingset,
+  makeSwingsetController,
   loadBasedir,
   loadSwingsetConfigFile,
 } from '@agoric/swingset-vat';
@@ -18,7 +19,7 @@ const log = anylogger('launch-chain');
 const SWING_STORE_META_KEY = 'cosmos/meta';
 
 async function buildSwingset(
-  mailboxState,
+  mailboxStorage,
   bridgeOutbound,
   storage,
   vatsDir,
@@ -30,42 +31,46 @@ async function buildSwingset(
   if (config === null) {
     config = loadBasedir(vatsDir);
   }
-  const mbs = buildMailboxStateMap();
-  mbs.populateFromData(mailboxState);
+  const mbs = buildMailboxStateMap(mailboxStorage);
   const timer = buildTimer();
   const mb = buildMailbox(mbs);
   const bd = buildBridge(bridgeOutbound);
-  config.devices = [
-    ['bridge', bd.srcPath, bd.endowments],
-    ['mailbox', mb.srcPath, mb.endowments],
-    ['timer', timer.srcPath, timer.endowments],
-  ];
+  config.devices = {
+    bridge: {
+      sourceSpec: bd.srcPath,
+    },
+    mailbox: {
+      sourceSpec: mb.srcPath,
+    },
+    timer: {
+      sourceSpec: timer.srcPath,
+    },
+  };
+  const deviceEndowments = {
+    bridge: { ...bd.endowments },
+    mailbox: { ...mb.endowments },
+    timer: { ...timer.endowments },
+  };
 
-  const controller = await buildVatController(config, argv, {
-    hostStorage: storage,
-    debugPrefix,
-  });
+  if (!swingsetIsInitialized(storage)) {
+    await initializeSwingset(config, argv, storage, { debugPrefix });
+  }
+  const controller = await makeSwingsetController(storage, deviceEndowments);
   await controller.run();
 
   const bridgeInbound = bd.deliverInbound;
-  return { controller, mb, mbs, bridgeInbound, timer };
+  return { controller, mb, bridgeInbound, timer };
 }
 
 export async function launch(
   kernelStateDBDir,
   mailboxStorage,
   doOutboundBridge,
-  flushChainSends,
   vatsDir,
   argv,
   debugName = undefined,
 ) {
   log.info('Launching SwingSet kernel');
-
-  log(`checking for saved mailbox state`, mailboxStorage.has('mailbox'));
-  const mailboxState = mailboxStorage.has('mailbox')
-    ? JSON.parse(mailboxStorage.get('mailbox'))
-    : {};
 
   const tempdir = path.resolve(kernelStateDBDir, 'check-lmdb-tempdir');
   const { openSwingStore } = getBestSwingStore(tempdir);
@@ -76,8 +81,8 @@ export async function launch(
     return doOutboundBridge(dstID, obj);
   }
   log.debug(`buildSwingset`);
-  const { controller, mb, mbs, bridgeInbound, timer } = await buildSwingset(
-    mailboxState,
+  const { controller, mb, bridgeInbound, timer } = await buildSwingset(
+    mailboxStorage,
     bridgeOutbound,
     storage,
     vatsDir,
@@ -85,29 +90,17 @@ export async function launch(
     debugName,
   );
 
-  function saveChainState() {
-    // now check mbs
-    const newState = mbs.exportToData();
-    const newData = djson.stringify(newState);
-
+  async function saveChainState() {
     // Save the mailbox state.
-    for (const peer of Object.getOwnPropertyNames(newState)) {
-      const data = {
-        outbox: newState[peer].outbox,
-        ack: newState[peer].inboundAck,
-      };
-      mailboxStorage.set(`mailbox.${peer}`, djson.stringify(data));
-    }
-    mailboxStorage.set('mailbox', newData);
-    return { mailboxSize: newData.length };
+    await mailboxStorage.commit();
   }
 
-  function saveOutsideState(savedHeight, savedActions) {
+  async function saveOutsideState(savedHeight, savedActions, savedChainSends) {
     storage.set(
       SWING_STORE_META_KEY,
-      JSON.stringify([savedHeight, savedActions]),
+      JSON.stringify([savedHeight, savedActions, savedChainSends]),
     );
-    commit();
+    await commit();
   }
 
   async function deliverInbound(sender, messages, ack) {
@@ -141,18 +134,18 @@ export async function launch(
     await controller.run();
   }
 
-  const [savedHeight, savedActions] = JSON.parse(
-    storage.get(SWING_STORE_META_KEY) || '[-1, []]',
+  const [savedHeight, savedActions, savedChainSends] = JSON.parse(
+    storage.get(SWING_STORE_META_KEY) || '[0, [], []]',
   );
   return {
     deliverInbound,
     doBridgeInbound,
     // bridgeOutbound,
-    flushChainSends,
     beginBlock,
     saveChainState,
     saveOutsideState,
     savedHeight,
     savedActions,
+    savedChainSends,
   };
 }

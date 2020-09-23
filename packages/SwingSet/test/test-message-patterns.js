@@ -5,7 +5,14 @@
 import '@agoric/install-ses';
 import test from 'ava';
 import path from 'path';
-import { buildVatController, loadBasedir } from '../src/index';
+import bundleSource from '@agoric/bundle-source';
+import { initSwingStore } from '@agoric/swing-store-simple';
+import {
+  initializeSwingset,
+  makeSwingsetController,
+  buildVatController,
+  buildKernelBundles,
+} from '../src/index';
 import { buildLoopbox } from '../src/devices/loopbox';
 import { buildPatterns } from './message-patterns';
 
@@ -38,13 +45,52 @@ async function runWithTrace(c) {
   }
 }
 
-export async function runVatsLocally(t, name) {
-  console.log(`------ testing pattern (local) -- ${name}`);
+test.before(async t => {
+  const kernelBundles = await buildKernelBundles();
   const bdir = path.resolve(__dirname, 'basedir-message-patterns');
-  const config = await loadBasedir(bdir);
-  config.bootstrap = 'bootstrap';
-  config.vats.bootstrap = { sourceSpec: path.join(bdir, 'bootstrap-local.js') };
-  const c = await buildVatController(config, [name]);
+  const bundleA = await bundleSource(path.resolve(bdir, 'vat-a.js'));
+  const bundleB = await bundleSource(path.resolve(bdir, 'vat-b.js'));
+
+  const bootstrapLocal = path.resolve(bdir, 'bootstrap-local.js');
+  const bundleLocal = await bundleSource(bootstrapLocal);
+  const localConfig = {
+    bootstrap: 'bootstrap',
+    vats: {
+      bootstrap: { bundle: bundleLocal },
+      a: { bundle: bundleA },
+      b: { bundle: bundleB },
+    },
+  };
+
+  const bootstrapComms = path.resolve(bdir, 'bootstrap-comms.js');
+  const bundleComms = await bundleSource(bootstrapComms);
+  const moreComms = {
+    bundle: kernelBundles.comms,
+    creationOptions: {
+      enablePipelining: true,
+      enableSetup: true,
+    },
+  };
+  const moreVatTP = { bundle: kernelBundles.vattp };
+  const commsConfig = {
+    bootstrap: 'bootstrap',
+    vats: {
+      bootstrap: { bundle: bundleComms },
+      a: { bundle: bundleA },
+      b: { bundle: bundleB },
+      leftcomms: moreComms,
+      rightcomms: moreComms,
+      leftvattp: moreVatTP,
+      rightvattp: moreVatTP,
+    },
+  };
+
+  t.context.data = { localConfig, commsConfig, kernelBundles };
+});
+
+export async function runVatsLocally(t, name) {
+  const { localConfig: config, kernelBundles } = t.context.data;
+  const c = await buildVatController(config, [name], { kernelBundles });
   // await runWithTrace(c);
   await c.run();
   return c.dump().log;
@@ -57,40 +103,32 @@ async function testLocalPattern(t, name) {
 }
 testLocalPattern.title = (_, name) => `test pattern ${name} local`;
 for (const name of Array.from(bp.patterns.keys()).sort()) {
-  test('local patterns', testLocalPattern, name);
+  if (name === 'a51') {
+    // TODO https://github.com/Agoric/agoric-sdk/issues/1631
+    // eslint-disable-next-line no-continue
+    continue;
+  }
+  test.serial('local patterns', testLocalPattern, name);
 }
 
-const commsSourcePath = require.resolve('../src/vats/comms');
-const vatTPSourcePath = require.resolve('../src/vats/vat-tp');
-
-export async function runVatsInComms(t, enablePipelining, name) {
-  console.log(`------ testing pattern (comms) -- ${name}`);
-  const enableSetup = true;
-  const bdir = path.resolve(__dirname, 'basedir-message-patterns');
-  const config = await loadBasedir(bdir);
-  config.bootstrap = 'bootstrap';
-  config.vats.bootstrap = { sourceSpec: path.join(bdir, 'bootstrap-comms.js') };
-  config.vats.leftcomms = {
-    sourceSpec: commsSourcePath,
-    creationOptions: {
-      enablePipelining,
-      enableSetup,
-    },
-  };
-  config.vats.rightcomms = {
-    sourceSpec: commsSourcePath,
-    creationOptions: {
-      enablePipelining,
-      enableSetup,
-    },
-  };
-  config.vats.leftvattp = { sourceSpec: vatTPSourcePath };
-  config.vats.rightvattp = { sourceSpec: vatTPSourcePath };
+export async function runVatsInComms(t, name) {
+  const { commsConfig, kernelBundles } = t.context.data;
   const { passOneMessage, loopboxSrcPath, loopboxEndowments } = buildLoopbox(
     'queued',
   );
-  config.devices = [['loopbox', loopboxSrcPath, loopboxEndowments]];
-  const c = await buildVatController(config, [name]);
+  const devices = {
+    loopbox: {
+      sourceSpec: loopboxSrcPath,
+    },
+  };
+  const config = { ...commsConfig, devices };
+  const deviceEndowments = {
+    loopbox: { ...loopboxEndowments },
+  };
+  const hostStorage = initSwingStore().storage;
+  await initializeSwingset(config, [name], hostStorage, { kernelBundles });
+  const c = await makeSwingsetController(hostStorage, deviceEndowments);
+
   // await runWithTrace(c);
   await c.run();
   while (passOneMessage()) {
@@ -100,10 +138,9 @@ export async function runVatsInComms(t, enablePipelining, name) {
 }
 
 async function testCommsPattern(t, name) {
-  const enablePipelining = true;
-  const logs = await runVatsInComms(t, enablePipelining, name);
+  const logs = await runVatsInComms(t, name);
   let expected;
-  if (enablePipelining && name in bp.expected_pipelined) {
+  if (name in bp.expected_pipelined) {
     expected = bp.expected_pipelined[name];
   } else {
     expected = bp.expected[name];
@@ -112,5 +149,6 @@ async function testCommsPattern(t, name) {
 }
 testCommsPattern.title = (_, name) => `test pattern ${name} comms`;
 for (const name of Array.from(bp.patterns.keys()).sort()) {
-  test('comms patterns', testCommsPattern, name);
+  // TODO https://github.com/Agoric/agoric-sdk/issues/1631
+  test.serial('comms patterns', testCommsPattern, name);
 }

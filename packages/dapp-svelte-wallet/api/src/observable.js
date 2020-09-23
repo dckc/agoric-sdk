@@ -2,13 +2,13 @@
  * @param {import("@agoric/eventual-send").EProxy} E
  * @param {Purse} purse
  * @param {() => void} onFulfilled
- * @return {Purse}
+ * @returns {Purse}
  */
 export default function makeObservablePurse(E, purse, onFulfilled) {
   return {
-    makeDepositFacet() {
+    getDepositFacet() {
       return E(purse)
-        .makeDepositFacet()
+        .getDepositFacet()
         .then(depositOnlyFacet => {
           return {
             receive(...args) {

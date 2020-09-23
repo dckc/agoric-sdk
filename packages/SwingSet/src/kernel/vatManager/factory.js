@@ -1,4 +1,3 @@
-/* global harden */
 import { assert } from '@agoric/assert';
 import { assertKnownOptions } from '../../assertOptions';
 import { makeLocalVatManagerFactory } from './localVatManager';
@@ -28,16 +27,19 @@ export function makeVatManagerFactory({
   const nodeWorkerFactory = makeNodeWorkerVatManagerFactory({
     makeNodeWorker,
     kernelKeeper,
+    testLog: allVatPowers.testLog,
   });
 
   const nodeSubprocessFactory = makeNodeSubprocessFactory({
     startSubprocessWorker: startSubprocessWorkerNode,
     kernelKeeper,
+    testLog: allVatPowers.testLog,
   });
 
   const xsWorkerFactory = makeNodeSubprocessFactory({
     startSubprocessWorker: startSubprocessWorkerXS,
     kernelKeeper,
+    testLog: allVatPowers.testLog,
   });
 
   function validateManagerOptions(managerOptions) {
@@ -53,23 +55,13 @@ export function makeVatManagerFactory({
       'vatParameters',
       'vatConsole',
     ]);
-    const {
-      setup,
-      bundle,
-      enableSetup = false,
-      metered = false,
-      notifyTermination,
-    } = managerOptions;
+    const { setup, bundle, enableSetup = false } = managerOptions;
     assert(setup || bundle);
     assert(
       !bundle || typeof bundle === 'object',
       `bundle must be object, not a plain string`,
     );
     assert(!(setup && !enableSetup), `setup() provided, but not enabled`); // todo maybe useless
-    assert(
-      !(notifyTermination && !metered),
-      `notifyTermination is currently useless without metered:true`,
-    ); // explicit termination will change that
   }
 
   // returns promise for new vatManager

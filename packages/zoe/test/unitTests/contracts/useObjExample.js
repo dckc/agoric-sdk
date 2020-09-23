@@ -9,6 +9,7 @@ import {
 
 /**
  * Give a use object when a payment is escrowed
+ *
  * @type {ContractStartFn}
  */
 const start = zcf => {
@@ -19,9 +20,13 @@ const start = zcf => {
   const amountMath = zcf.getAmountMath(pixelBrand);
 
   const makeUseObj = seat => {
+    assertProposalShape(seat, {
+      give: { Pixels: null },
+    });
     const useObj = harden({
       /**
        * (Pretend to) color some pixels.
+       *
        * @param {string} color
        * @param {Amount} amountToColor
        */
@@ -49,17 +54,9 @@ const start = zcf => {
     return useObj;
   };
 
-  const expected = harden({
-    give: { Pixels: null },
-  });
-
   const publicFacet = {
     // The only publicFacet method is to make an invitation.
-    makeInvitation: () =>
-      zcf.makeInvitation(
-        assertProposalShape(makeUseObj, expected),
-        'use object',
-      ),
+    makeInvitation: () => zcf.makeInvitation(makeUseObj, 'use object'),
   };
 
   return harden({ publicFacet });

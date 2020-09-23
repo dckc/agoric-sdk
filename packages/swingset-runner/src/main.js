@@ -5,9 +5,10 @@ import util from 'util';
 
 import { makeStatLogger } from '@agoric/stat-logger';
 import {
-  buildVatController,
   loadSwingsetConfigFile,
   loadBasedir,
+  initializeSwingset,
+  makeSwingsetController,
 } from '@agoric/swingset-vat';
 import {
   initSwingStore as initSimpleSwingStore,
@@ -38,10 +39,12 @@ Command line:
   runner [FLAGS...] CMD [{BASEDIR|--} [ARGS...]]
 
 FLAGS may be:
-  --init           - discard any existing saved state at startup.
+  --init           - discard any existing saved state at startup
+  --initonly       - initialize the swingset but exit without running it
   --lmdb           - runs using LMDB as the data store (default)
   --filedb         - runs using the simple file-based data store
   --memdb          - runs using the non-persistent in-memory data store
+  --dbdir DIR      - specify where the data store should go (default BASEDIR)
   --blockmode      - run in block mode (checkpoint every BLOCKSIZE blocks)
   --blocksize N    - set BLOCKSIZE to N cranks (default 200)
   --logtimes       - log block execution time stats while running
@@ -166,12 +169,18 @@ export async function main() {
   let launchIndirectly = false;
   let benchmarkRounds = 0;
   let configPath = null;
+  let dbDir = null;
+  let initOnly = false;
 
   while (argv[0] && argv[0].startsWith('-')) {
     const flag = argv.shift();
     switch (flag) {
       case '--init':
         forceReset = true;
+        break;
+      case '--initonly':
+        forceReset = true;
+        initOnly = true;
         break;
       case '--logtimes':
         logTimes = true;
@@ -222,6 +231,9 @@ export async function main() {
       case '--dumptag':
         dumpTag = argv.shift();
         doDumps = true;
+        break;
+      case '--dbdir':
+        dbDir = argv.shift();
         break;
       case '--raw':
         rawMode = true;
@@ -306,9 +318,12 @@ export async function main() {
   if (launchIndirectly) {
     config = generateIndirectConfig(config);
   }
+  if (!dbDir) {
+    dbDir = basedir;
+  }
 
   let store;
-  const kernelStateDBDir = path.join(basedir, 'swingset-kernel-state');
+  const kernelStateDBDir = path.join(dbDir, 'swingset-kernel-state');
   switch (dbMode) {
     case '--filedb':
       if (forceReset) {
@@ -334,25 +349,35 @@ export async function main() {
     config.vats[config.bootstrap].parameters.metered = meterVats;
   }
   const runtimeOptions = {};
-  if (store) {
-    runtimeOptions.hostStorage = store.storage;
-  }
   if (verbose) {
     runtimeOptions.verbose = true;
   }
-  const controller = await buildVatController(
-    config,
-    bootstrapArgv,
+  let bootstrapResult;
+  if (forceReset) {
+    bootstrapResult = await initializeSwingset(
+      config,
+      bootstrapArgv,
+      store.storage,
+      runtimeOptions,
+    );
+    if (initOnly) {
+      store.commit();
+      store.close();
+      return;
+    }
+  }
+  const controller = await makeSwingsetController(
+    store.storage,
+    {},
     runtimeOptions,
   );
-  let bootstrapResult = controller.bootstrapResult;
 
   let blockNumber = 0;
   let statLogger = null;
   if (logTimes || logMem || logDisk) {
     let headers = ['block', 'steps'];
     if (logTimes) {
-      headers.push('btime');
+      headers.push('btime', 'ctime');
     }
     if (logMem) {
       headers = headers.concat(['rss', 'heapTotal', 'heapUsed', 'external']);
@@ -480,11 +505,11 @@ export async function main() {
       );
       // eslint-disable-next-line no-await-in-loop
       const [steps, deltaT] = await runBatch(0, true);
-      const status = roundResult.status();
+      const status = controller.kpStatus(roundResult);
       if (status === 'pending') {
         log(`benchmark round ${i + 1} did not finish`);
       } else {
-        const resolution = JSON.stringify(roundResult.resolution());
+        const resolution = JSON.stringify(controller.kpResolution(roundResult));
         log(`benchmark round ${i + 1} ${status}: ${resolution}`);
       }
       totalSteps += steps;
@@ -521,6 +546,7 @@ export async function main() {
         log(`===> end of crank ${crankNumber}`);
       }
     }
+    const commitStartTime = readClock();
     if (doCommit) {
       store.commit();
     }
@@ -533,6 +559,7 @@ export async function main() {
       let data = [blockNumber, actualSteps];
       if (logTimes) {
         data.push(blockEndTime - blockStartTime);
+        data.push(blockEndTime - commitStartTime);
       }
       if (logMem) {
         const mem = process.memoryUsage();
@@ -590,32 +617,29 @@ export async function main() {
       totalSteps += moreSteps;
       deltaT += moreDeltaT;
     }
-    store.close();
     if (bootstrapResult) {
-      const status = bootstrapResult.status();
+      const status = controller.kpStatus(bootstrapResult);
       if (status === 'pending') {
         log('bootstrap result still pending');
+      } else if (status === 'unknown') {
+        log(`bootstrap result ${bootstrapResult} is unknown to the kernel`);
+        bootstrapResult = null;
       } else {
-        const resolution = JSON.stringify(bootstrapResult.resolution());
+        const resolution = JSON.stringify(
+          controller.kpResolution(bootstrapResult),
+        );
         log(`bootstrap result ${status}: ${resolution}`);
         bootstrapResult = null;
       }
     }
-    if (logTimes) {
-      if (totalSteps) {
-        const per = deltaT / BigInt(totalSteps);
-        log(
-          `runner finished ${totalSteps} cranks in ${deltaT} ns (${per}/crank)`,
-        );
-      } else {
-        log(`runner finished replay in ${deltaT} ns`);
-      }
+    store.close();
+    if (totalSteps) {
+      const per = deltaT / BigInt(totalSteps);
+      log(
+        `runner finished ${totalSteps} cranks in ${deltaT} ns (${per}/crank)`,
+      );
     } else {
-      if (totalSteps) {
-        log(`runner finished ${totalSteps} cranks`);
-      } else {
-        log(`runner finished replay`);
-      }
+      log(`runner finished replay in ${deltaT} ns`);
     }
   }
 }

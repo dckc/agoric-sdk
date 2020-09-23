@@ -9,14 +9,6 @@ import { objectMap } from '../objArrayConversion';
 import '../types';
 import '../internal-types';
 
-// Offerless seat case
-
-const defaultExitObj = harden({
-  exit: () => {
-    throw new Error(`Offerless seats may not be exited`);
-  },
-});
-
 /**
  * makeZoeSeatAdminKit makes an object that manages the state of a seat
  * participating in a Zoe contract and return its two facets.
@@ -35,9 +27,12 @@ export const makeZoeSeatAdminKit = (
   instanceAdmin,
   proposal,
   brandToPurse,
-  { offerResult = undefined, exitObj = defaultExitObj } = {},
+  exitObj,
+  offerResult,
 ) => {
   const payoutPromiseKit = makePromiseKit();
+  // Don't trigger Node.js's UnhandledPromiseRejectionWarning
+  payoutPromiseKit.promise.catch(_ => {});
   const { notifier, updater } = makeNotifierKit();
 
   let currentAllocation = initialAllocation;
@@ -82,8 +77,6 @@ export const makeZoeSeatAdminKit = (
       );
       updater.fail(reason);
       doExit(zoeSeatAdmin);
-      console.log(reason);
-      throw reason;
     },
     getCurrentAllocation: () => currentAllocation,
   });
@@ -93,10 +86,12 @@ export const makeZoeSeatAdminKit = (
     getCurrentAllocation: async () => zoeSeatAdmin.getCurrentAllocation(),
     getProposal: async () => proposal,
     getPayouts: async () => payoutPromiseKit.promise,
-    getPayout: async keyword =>
-      payoutPromiseKit.promise.then(payouts => payouts[keyword]),
+    getPayout: async keyword => {
+      assert(keyword, 'A keyword must be provided');
+      return E.G(payoutPromiseKit.promise)[keyword];
+    },
     getOfferResult: async () => offerResult,
-    hasExited: async () => instanceAdmin.hasZoeSeatAdmin(zoeSeatAdmin),
+    hasExited: async () => !instanceAdmin.hasZoeSeatAdmin(zoeSeatAdmin),
     tryExit: async () => E(exitObj).exit(),
     getNotifier: async () => notifier,
   });

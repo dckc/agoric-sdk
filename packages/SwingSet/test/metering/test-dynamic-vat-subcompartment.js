@@ -1,5 +1,3 @@
-/* global harden */
-
 import '@agoric/install-metering-and-ses';
 import bundleSource from '@agoric/bundle-source';
 import test from 'ava';
@@ -60,7 +58,7 @@ test('metering dynamic vat which imports bundle', async t => {
     capargs([grandchildBundle]),
   );
   await c.run();
-  t.deepEqual(r.resolution(), capargs('ok'));
+  t.deepEqual(c.kpResolution(r), capargs('ok'));
 
   // First, send a message to the grandchild that runs normally
   c.queueToVatExport('bootstrap', 'o+0', 'bundleRun', capargs([]));
@@ -82,8 +80,8 @@ test('metering dynamic vat which imports bundle', async t => {
   t.deepEqual(
     nextLog(),
     [
-      'did explode: RangeError: Allocate meter exceeded',
-      'terminated: RangeError: Allocate meter exceeded',
+      'did explode: vat terminated',
+      'terminated: Error: Allocate meter exceeded',
     ],
     'grandchild go boom',
   );
@@ -93,7 +91,7 @@ test('metering dynamic vat which imports bundle', async t => {
   await c.run();
   t.deepEqual(
     nextLog(),
-    ['run exploded: RangeError: Allocate meter exceeded'],
+    ['run exploded: vat terminated'],
     'whole dynamic vat is dead',
   );
 });

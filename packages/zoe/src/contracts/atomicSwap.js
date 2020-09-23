@@ -11,6 +11,7 @@ import '../../exported';
 
 /**
  * Trade one item for another.
+ * https://agoric.com/documentation/zoe/guide/contracts/atomic-swap.html
  *
  * The initial offer is { give: { Asset: A }, want: { Price: B } }.
  * The outcome from the first offer is an invitation for the second party,
@@ -25,6 +26,10 @@ const start = zcf => {
 
   /** @type {OfferHandler} */
   const makeMatchingInvitation = firstSeat => {
+    assertProposalShape(firstSeat, {
+      give: { Asset: null },
+      want: { Price: null },
+    });
     const { want, give } = firstSeat.getProposal();
 
     /** @type {OfferHandler} */
@@ -45,13 +50,8 @@ const start = zcf => {
     return matchingSeatInvitation;
   };
 
-  const firstProposalExpected = harden({
-    give: { Asset: null },
-    want: { Price: null },
-  });
-
   const creatorInvitation = zcf.makeInvitation(
-    assertProposalShape(makeMatchingInvitation, firstProposalExpected),
+    makeMatchingInvitation,
     'firstOffer',
   );
 

@@ -27,6 +27,8 @@ export const makeZcfSeatAdminKit = (
 
   /** @type {ZCFSeatAdmin} */
   const zcfSeatAdmin = harden({
+    // Updates the currentAllocation of the seat, using the allocation
+    // from seatStaging.
     commit: seatStaging => {
       assertExitedFalse();
       assert(
@@ -34,7 +36,6 @@ export const makeZcfSeatAdminKit = (
         details`The seatStaging ${seatStaging} was not recognized`,
       );
       currentAllocation = seatStaging.getStagedAllocation();
-      E(zoeSeatAdmin).replaceAllocation(currentAllocation);
     },
     updateHasExited: () => {
       assertExitedFalse();
@@ -54,11 +55,11 @@ export const makeZcfSeatAdminKit = (
         'Kicked out of seat. Please check the log for more information.',
       ),
     ) => {
-      assertExitedFalse();
-      zcfSeatAdmin.updateHasExited();
-      E(zoeSeatAdmin).kickOut(harden(reason));
-      console.error(reason);
-      throw reason;
+      if (!exited) {
+        zcfSeatAdmin.updateHasExited();
+        E(zoeSeatAdmin).kickOut(harden(reason));
+      }
+      return reason;
     },
     getNotifier: () => {
       return notifier;
@@ -72,6 +73,7 @@ export const makeZcfSeatAdminKit = (
       if (currentAllocation[keyword] !== undefined) {
         return currentAllocation[keyword];
       }
+      assert(brand, `A brand must be supplied when the keyword is not defined`);
       return getAmountMath(brand).getEmpty();
     },
     getCurrentAllocation: () => {

@@ -1,5 +1,3 @@
-/* global harden */
-
 import { buildPatterns } from '../message-patterns';
 
 export function buildRootObject(vatPowers) {
@@ -17,7 +15,6 @@ export function buildRootObject(vatPowers) {
     },
 
     async run(which) {
-      console.log(`running alice[${which}]`);
       await alice[which]();
     },
   });

@@ -95,15 +95,23 @@ const build = async (log, zoe, issuers, payments, installations, timer) => {
         optionValue[0].description === 'exerciseOption',
         details`wrong invitation`,
       );
-      assert(moolaAmountMath.isEqual(optionValue[0].underlyingAsset, moola(3)));
       assert(
-        simoleanAmountMath.isEqual(optionValue[0].strikePrice, simoleans(7)),
+        moolaAmountMath.isEqual(
+          optionValue[0].underlyingAssets.UnderlyingAsset,
+          moola(3),
+        ),
+      );
+      assert(
+        simoleanAmountMath.isEqual(
+          optionValue[0].strikePrice.StrikePrice,
+          simoleans(7),
+        ),
       );
       assert(
         optionValue[0].expirationDate === 1,
         details`wrong expirationDate`,
       );
-      assert(optionValue[0].timerAuthority === timer, 'wrong timer');
+      assert(optionValue[0].timeAuthority === timer, 'wrong timer');
       const { UnderlyingAsset, StrikePrice } = issuerKeywordRecord;
 
       assert(
@@ -160,18 +168,24 @@ const build = async (log, zoe, issuers, payments, installations, timer) => {
         details`wrong invitation`,
       );
       assert(
-        moolaAmountMath.isEqual(optionValue[0].underlyingAsset, moola(3)),
+        moolaAmountMath.isEqual(
+          optionValue[0].underlyingAssets.UnderlyingAsset,
+          moola(3),
+        ),
         details`wrong underlying asset`,
       );
       assert(
-        simoleanAmountMath.isEqual(optionValue[0].strikePrice, simoleans(7)),
+        simoleanAmountMath.isEqual(
+          optionValue[0].strikePrice.StrikePrice,
+          simoleans(7),
+        ),
         details`wrong strike price`,
       );
       assert(
         optionValue[0].expirationDate === 100,
         details`wrong expiration date`,
       );
-      assert(optionValue[0].timerAuthority === timer, details`wrong timer`);
+      assert(optionValue[0].timeAuthority === timer, details`wrong timer`);
       assert(
         UnderlyingAsset === moolaIssuer,
         details`The underlyingAsset issuer should be the moola issuer`,
@@ -416,7 +430,7 @@ const build = async (log, zoe, issuers, payments, installations, timer) => {
 
     doAutoswap: async instance => {
       const publicFacet = await E(zoe).getPublicFacet(instance);
-      const buyBInvitation = await E(publicFacet).makeSwapInvitation();
+      const buyBInvitation = await E(publicFacet).makeSwapInInvitation();
       const installation = await E(zoe).getInstallation(buyBInvitation);
       const issuerKeywordRecord = await E(zoe).getIssuers(instance);
       assert(
@@ -427,8 +441,8 @@ const build = async (log, zoe, issuers, payments, installations, timer) => {
       assert(
         sameStructure(
           harden({
-            TokenA: moolaIssuer,
-            TokenB: simoleanIssuer,
+            Central: moolaIssuer,
+            Secondary: simoleanIssuer,
             Liquidity: liquidityIssuer,
           }),
           issuerKeywordRecord,
@@ -436,8 +450,8 @@ const build = async (log, zoe, issuers, payments, installations, timer) => {
         details`issuers were not as expected`,
       );
 
-      // bob checks the price of 3 moola. The price is 1 simolean
-      const simoleanAmounts = await E(publicFacet).getCurrentPrice(
+      // bob checks how many simoleans he can get for 3 moola
+      const simoleanAmounts = await E(publicFacet).getInputPrice(
         moola(3),
         simoleans(0).brand,
       );
@@ -463,27 +477,27 @@ const build = async (log, zoe, issuers, payments, installations, timer) => {
       await E(moolaPurseP).deposit(await moolaPayout1);
       await E(simoleanPurseP).deposit(await simoleanPayout1);
 
-      // Bob looks up the price of 3 simoleans. It's 5 moola
-      const moolaAmounts = await E(publicFacet).getCurrentPrice(
+      // Bob looks up how much moola he can get for 3 simoleans. It's 5
+      const moolaProceeds = await E(publicFacet).getInputPrice(
         simoleans(3),
         moola(0).brand,
       );
-      log(`moolaAmounts `, moolaAmounts);
+      log(`moola proceeds `, moolaProceeds);
 
       // Bob makes another offer and swaps
-      const bobSimsForMoolaProposal = harden({
+      const bobSimsForMoolaProposa2 = harden({
         want: { Out: moola(5) },
         give: { In: simoleans(3) },
       });
       await E(simoleanPurseP).deposit(simoleanPayment);
-      const bobSimoleanPayment = await E(simoleanPurseP).withdraw(simoleans(3));
-      const simsForMoolaPayments = harden({ In: bobSimoleanPayment });
-      const invitation2 = E(publicFacet).makeSwapInvitation();
+      const bobSimPayment2 = await E(simoleanPurseP).withdraw(simoleans(3));
+      const simsForMoolaPayments2 = harden({ In: bobSimPayment2 });
+      const invitation2 = E(publicFacet).makeSwapInInvitation();
 
       const swapSeat2 = await E(zoe).offer(
         invitation2,
-        bobSimsForMoolaProposal,
-        simsForMoolaPayments,
+        bobSimsForMoolaProposa2,
+        simsForMoolaPayments2,
       );
 
       log(await E(swapSeat2).getOfferResult());
@@ -496,6 +510,13 @@ const build = async (log, zoe, issuers, payments, installations, timer) => {
 
       await showPurseBalance(moolaPurseP, 'bobMoolaPurse', log);
       await showPurseBalance(simoleanPurseP, 'bobSimoleanPurse', log);
+
+      // Bob looks up how much simoleans he'd have to pay for 3 moola. It's 6
+      const simRequired = await E(publicFacet).getOutputPrice(
+        moola(3),
+        simoleans(0).brand,
+      );
+      log(`simoleans required `, simRequired);
     },
 
     doBuyTickets: async (instance, invitation) => {
@@ -528,6 +549,33 @@ const build = async (log, zoe, issuers, payments, installations, timer) => {
         E(seat).getPayout('Items'),
       );
       log('boughtTicketAmount: ', boughtTicketAmount);
+    },
+
+    doOTCDesk: async untrustedInvitation => {
+      const invitation = await E(invitationIssuer).claim(untrustedInvitation);
+      const invitationValue = await E(zoe).getInvitationDetails(invitation);
+      assert(invitationValue.installation === installations.coveredCall);
+
+      // Bob can use whatever keywords he wants
+      const proposal = harden({
+        give: { Whatever1: simoleans(4) },
+        want: { Whatever2: moola(3) },
+        exit: { onDemand: null },
+      });
+      await E(simoleanPurseP).deposit(simoleanPayment);
+      const simoleanPayment1 = await E(simoleanPurseP).withdraw(simoleans(4));
+
+      const seat = await E(zoe).offer(invitation, proposal, {
+        Whatever1: simoleanPayment1,
+      });
+
+      log(await E(seat).getOfferResult());
+
+      const moolaPayout = await E(seat).getPayout('Whatever2');
+      const simoleansPayout = await E(seat).getPayout('Whatever1');
+
+      log(await E(moolaIssuer).getAmountOf(moolaPayout));
+      log(await E(simoleanIssuer).getAmountOf(simoleansPayout));
     },
   });
 };

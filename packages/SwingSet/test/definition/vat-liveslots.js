@@ -1,5 +1,3 @@
-/* global harden */
-
 export function buildRootObject(vatPowers) {
   let counter = 0;
   return harden({
@@ -13,7 +11,7 @@ export function buildRootObject(vatPowers) {
       return vatPowers.transformTildot('x~.foo(arg1)');
     },
     remotable() {
-      const r = vatPowers.Remotable('iface1');
+      const r = vatPowers.Remotable('Alleged: iface1');
       return vatPowers.getInterfaceOf(r);
     },
   });

@@ -1,22 +1,58 @@
-/* global harden HandledPromise */
+// @ts-check
+
 // Your app may need to `import '@agoric/eventual-send/shim'` to get HandledPromise
 
 // This logic was mostly lifted from @agoric/swingset-vat liveSlots.js
 // Defects in it are mfig's fault.
-import { Remotable, makeMarshal, QCLASS } from '@agoric/marshal';
-import { E } from '@agoric/eventual-send';
+import {
+  Remotable as defaultRemotable,
+  makeMarshal as defaultMakeMarshal,
+  QCLASS,
+} from '@agoric/marshal';
+import { E, HandledPromise } from '@agoric/eventual-send';
 import { isPromise } from '@agoric/promise-kit';
 
 export { E };
 
+/**
+ * @template T
+ * @typedef {import('@agoric/eventual-send').ERef<T>} ERef
+ */
+
+/**
+ * @typedef {Object} CapTPOptions the options to makeCapTP
+ * @property {(err: any) => void} onReject
+ * @property {typeof defaultRemotable} Remotable
+ * @property {typeof defaultMakeMarshal} makeMarshal
+ * @property {number} epoch
+ */
+/**
+ * Create a CapTP connection.
+ *
+ * @param {string} ourId our name for the current side
+ * @param {(obj: Record<string, any>) => void} rawSend send a JSONable packet
+ * @param {any} bootstrapObj the object to export to the other side
+ * @param {Partial<CapTPOptions>} opts options to the connection
+ */
 export function makeCapTP(ourId, rawSend, bootstrapObj = undefined, opts = {}) {
   const {
     onReject = err => console.error('CapTP', ourId, 'exception:', err),
+    Remotable = defaultRemotable,
+    makeMarshal = defaultMakeMarshal,
+    epoch = 0,
   } = opts;
 
+  const disconnectReason = id =>
+    Error(`${JSON.stringify(id)} connection closed`);
+
+  /** @type {any} */
   let unplug = false;
   async function quietReject(reason = undefined, returnIt = true) {
-    if (onReject && (unplug === false || reason !== unplug)) {
+    if (
+      onReject &&
+      (unplug === false || reason !== unplug) &&
+      reason !== undefined
+    ) {
       onReject(reason);
     }
     if (!returnIt) {
@@ -30,10 +66,13 @@ export function makeCapTP(ourId, rawSend, bootstrapObj = undefined, opts = {}) {
     return p;
   }
 
-  function send(...args) {
+  /**
+   * @param {Record<string, any>} obj
+   */
+  function send(obj) {
     // Don't throw here if unplugged, just don't send.
     if (unplug === false) {
-      rawSend(...args);
+      rawSend(obj);
     }
   }
 
@@ -49,6 +88,9 @@ export function makeCapTP(ourId, rawSend, bootstrapObj = undefined, opts = {}) {
     convertSlotToVal,
   );
 
+  const valToSlot = new WeakMap(); // exports looked up by val
+  const slotToVal = new Map(); // reverse
+
   // Used to construct slot names for promises/non-promises.
   // In this verison of CapTP we use strings for export/import slot names.
   // prefixed with 'p' if promises and 'o' otherwise;
@@ -58,8 +100,6 @@ export function makeCapTP(ourId, rawSend, bootstrapObj = undefined, opts = {}) {
   // the question key
   let lastQuestionID = 0;
 
-  const valToSlot = new WeakMap(); // exports looked up by val
-  const slotToVal = new Map(); // exports looked up by slot
   const questions = new Map(); // chosen by us
   const answers = new Map(); // chosen by our peer
   const imports = new Map(); // chosen by our peer
@@ -113,21 +153,23 @@ export function makeCapTP(ourId, rawSend, bootstrapObj = undefined, opts = {}) {
     return valToSlot.get(val);
   }
 
-  // Generate a new question in the questions table and set up a new
-  // remote handled promise.
-  // Returns: [questionId, pr]
-  //   where `pr` is the HandledPromise for this question.
+  /**
+   * Generate a new question in the questions table and set up a new
+   * remote handled promise.
+   *
+   * @returns {[number, ReturnType<typeof makeRemoteKit>]}
+   */
   function makeQuestion() {
     lastQuestionID += 1;
     const questionID = lastQuestionID;
     // eslint-disable-next-line no-use-before-define
-    const pr = makeRemote(questionID);
+    const pr = makeRemoteKit(questionID);
     questions.set(questionID, pr);
     return [questionID, pr];
   }
 
   // Make a remote promise for `target` (an id in the questions table)
-  function makeRemote(target) {
+  function makeRemoteKit(target) {
     // This handler is set up such that it will transform both
     // attribute access and method invocation of this remote promise
     // as also being questions / remote handled promises
@@ -139,6 +181,7 @@ export function makeCapTP(ourId, rawSend, bootstrapObj = undefined, opts = {}) {
         const [questionID, pr] = makeQuestion();
         send({
           type: 'CTP_CALL',
+          epoch,
           questionID,
           target,
           method: serialize(harden([prop])),
@@ -153,6 +196,7 @@ export function makeCapTP(ourId, rawSend, bootstrapObj = undefined, opts = {}) {
         const [questionID, pr] = makeQuestion();
         send({
           type: 'CTP_CALL',
+          epoch,
           questionID,
           target,
           method: serialize(harden([prop, args])),
@@ -176,7 +220,7 @@ export function makeCapTP(ourId, rawSend, bootstrapObj = undefined, opts = {}) {
   }
 
   // Set up import
-  function convertSlotToVal(theirSlot) {
+  function convertSlotToVal(theirSlot, iface = undefined) {
     let val;
     // Invert slot direction from other side.
 
@@ -189,11 +233,14 @@ export function makeCapTP(ourId, rawSend, bootstrapObj = undefined, opts = {}) {
     const slot = `${theirSlot[0]}${otherDir}${theirSlot.slice(2)}`;
     if (!slotToVal.has(slot)) {
       // Make a new handled promise for the slot.
-      const pr = makeRemote(slot);
+      const pr = makeRemoteKit(slot);
       if (slot[0] === 'o') {
         // A new remote presence
         const pres = pr.resPres();
-        val = Remotable(`Presence ${ourId} ${slot}`, undefined, pres);
+        if (iface === undefined) {
+          iface = `Alleged: Presence ${ourId} ${slot}`;
+        }
+        val = Remotable(iface, undefined, pres);
       } else {
         // A new promise
         imports.set(Number(slot.slice(2)), pr);
@@ -212,12 +259,15 @@ export function makeCapTP(ourId, rawSend, bootstrapObj = undefined, opts = {}) {
       const { questionID } = obj;
       const bootstrap =
         typeof bootstrapObj === 'function' ? bootstrapObj() : bootstrapObj;
-      // console.log('sending bootstrap', bootstrap);
-      answers.set(questionID, bootstrap);
-      return send({
-        type: 'CTP_RETURN',
-        answerID: questionID,
-        result: serialize(bootstrap),
+      E.when(bootstrap, bs => {
+        // console.log('sending bootstrap', bootstrap);
+        answers.set(questionID, bs);
+        return send({
+          type: 'CTP_RETURN',
+          epoch,
+          answerID: questionID,
+          result: serialize(bs),
+        });
       });
     },
     // Remote is invoking a method or retrieving a property.
@@ -253,6 +303,7 @@ export function makeCapTP(ourId, rawSend, bootstrapObj = undefined, opts = {}) {
         .then(res =>
           send({
             type: 'CTP_RETURN',
+            epoch,
             answerID: questionID,
             result: serialize(harden(res)),
           }),
@@ -260,6 +311,7 @@ export function makeCapTP(ourId, rawSend, bootstrapObj = undefined, opts = {}) {
         .catch(rej =>
           send({
             type: 'CTP_RETURN',
+            epoch,
             answerID: questionID,
             exception: serialize(harden(rej)),
           }),
@@ -288,18 +340,20 @@ export function makeCapTP(ourId, rawSend, bootstrapObj = undefined, opts = {}) {
     },
     // The other side has signaled something has gone wrong.
     // Pull the plug!
-    async CTP_ABORT(obj) {
-      const { exception } = obj;
-      send(obj);
+    async CTP_DISCONNECT(obj) {
+      const { reason = disconnectReason(ourId) } = obj;
       if (unplug === false) {
-        quietReject(exception, false);
-        unplug = exception;
+        // Reject with the original reason.
+        quietReject(obj.reason, false);
+        unplug = reason;
+        // Deliver the object, even though we're unplugged.
+        rawSend(obj);
       }
       for (const pr of questions.values()) {
-        pr.rej(exception);
+        pr.rej(reason);
       }
       for (const pr of imports.values()) {
-        pr.rej(exception);
+        pr.rej(reason);
       }
     },
   };
@@ -312,6 +366,7 @@ export function makeCapTP(ourId, rawSend, bootstrapObj = undefined, opts = {}) {
     const [questionID, pr] = makeQuestion();
     send({
       type: 'CTP_BOOTSTRAP',
+      epoch,
       questionID,
     });
     return harden(pr.p);
@@ -337,9 +392,67 @@ export function makeCapTP(ourId, rawSend, bootstrapObj = undefined, opts = {}) {
   };
 
   // Abort a connection.
-  const abort = (
-    exception = Error(`disconnected from ${JSON.stringify(ourId)}`),
-  ) => dispatch({ type: 'CTP_ABORT', exception });
+  const abort = (reason = undefined) => {
+    dispatch({ type: 'CTP_DISCONNECT', epoch, reason });
+  };
 
-  return harden({ abort, dispatch, getBootstrap });
+  return harden({ abort, dispatch, getBootstrap, serialize, unserialize });
+}
+
+/**
+ * Create an async-isolated channel to an object.
+ *
+ * @param {string} ourId
+ * @returns {{ makeFar<T>(x: T): ERef<T>, makeNear<T>(x: T): ERef<T>  }}
+ */
+export function makeLoopback(ourId) {
+  let nextNonce = 0;
+  const nonceToRef = new Map();
+
+  const bootstrap = harden({
+    refGetter: {
+      getRef(nonce) {
+        // Find the local ref for the specified nonce.
+        const xFar = nonceToRef.get(nonce);
+        nonceToRef.delete(nonce);
+        return xFar;
+      },
+    },
+  });
+
+  // Create the tunnel.
+  let farDispatch;
+  const { dispatch: nearDispatch, getBootstrap: getFarBootstrap } = makeCapTP(
+    `near-${ourId}`,
+    o => farDispatch(o),
+    bootstrap,
+  );
+  const { dispatch, getBootstrap: getNearBootstrap } = makeCapTP(
+    `far-${ourId}`,
+    nearDispatch,
+    bootstrap,
+  );
+  farDispatch = dispatch;
+
+  const farGetter = E.G(getFarBootstrap()).refGetter;
+  const nearGetter = E.G(getNearBootstrap()).refGetter;
+
+  /**
+   * @param {ERef<{ getRef(nonce: number): any }>} refGetter
+   */
+  const makeRefMaker = refGetter =>
+    /**
+     * @param {any} x
+     */
+    async x => {
+      const myNonce = nextNonce;
+      nextNonce += 1;
+      nonceToRef.set(myNonce, harden(x));
+      return E(refGetter).getRef(myNonce);
+    };
+
+  return {
+    makeFar: makeRefMaker(farGetter),
+    makeNear: makeRefMaker(nearGetter),
+  };
 }

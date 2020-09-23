@@ -1,5 +1,3 @@
-/* global harden */
-
 // We use vat-centric terminology here, so "inbound" means "into a vat",
 // generally from the kernel. We also have "comms vats" which use special
 // device access to interact with remote machines: messages from those
@@ -87,7 +85,6 @@ export function createSyscall(transcriptManager) {
       // (and we'll be terminated, but the kernel and all other vats will
       // continue). Emit enough of an error message to explain the errors
       // that are about to ensue on our way down.
-      console.error(`syscall suffered error, shutdown commencing`);
       throw Error(`syscall suffered error, shutdown commencing`);
     }
     // otherwise vres is ['ok', null] or ['ok', capdata]

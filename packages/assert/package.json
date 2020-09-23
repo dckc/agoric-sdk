@@ -1,6 +1,6 @@
 {
   "name": "@agoric/assert",
-  "version": "0.0.8",
+  "version": "0.0.11-dev.2",
   "description": "Assert expression support that protects sensitive data",
   "main": "src/assert.js",
   "engines": {
@@ -9,9 +9,11 @@
   "scripts": {
     "build": "exit 0",
     "test": "ava",
+    "test:nyc": "nyc ava",
     "lint-fix": "yarn lint --fix",
     "lint-check": "yarn lint",
-    "lint": "yarn lint:types && eslint '**/*.js'",
+    "lint": "yarn lint:types && yarn lint:eslint",
+    "lint:eslint": "eslint '**/*.js'",
     "lint:types": "tsc -p jsconfig.json",
     "lint-fix-jessie": "eslint -c '.eslintrc-jessie.js' --fix '**/*.js'",
     "lint-check-jessie": "eslint -c '.eslintrc-jessie.js' '**/*.js'"
@@ -30,25 +32,31 @@
     "url": "https://github.com/Agoric/agoric-sdk/issues"
   },
   "homepage": "https://github.com/Agoric/agoric-sdk#readme",
-  "dependencies": {},
   "devDependencies": {
-    "@agoric/install-ses": "^0.2.0",
-    "ava": "^3.11.1",
-    "esm": "^3.2.25"
+    "@agoric/install-ses": "^0.3.2-dev.2",
+    "ava": "^3.12.1",
+    "esm": "^3.2.25",
+    "nyc": "^15.1.0"
   },
   "files": [
     "src/",
     "NEWS.md"
   ],
   "ava": {
-    "files": ["test/**/test-*.js"],
-    "require": ["esm"]
+    "files": [
+      "test/**/test-*.js"
+    ],
+    "require": [
+      "esm"
+    ]
   },
   "eslintConfig": {
     "extends": [
       "airbnb-base",
-      "plugin:prettier/recommended"
+      "plugin:prettier/recommended",
+      "plugin:jsdoc/recommended"
     ],
+    "parser": "@typescript-eslint/parser",
     "env": {
       "es6": true
     },
@@ -79,7 +87,14 @@
       "no-unused-expressions": "off",
       "no-loop-func": "off",
       "no-inner-declarations": "off",
-      "import/prefer-default-export": "off"
+      "import/prefer-default-export": "off",
+      "import/no-extraneous-dependencies": "off",
+      "jsdoc/no-undefined-types": "off",
+      "jsdoc/require-jsdoc": "off",
+      "jsdoc/require-property-description": "off",
+      "jsdoc/require-param-description": "off",
+      "jsdoc/require-returns": "off",
+      "jsdoc/require-returns-description": "off"
     }
   },
   "eslintIgnore": [

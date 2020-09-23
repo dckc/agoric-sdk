@@ -1,6 +1,6 @@
 {
   "name": "@agoric/sdk",
-  "version": "2.6.0",
+  "version": "2.8.1-dev.3",
   "private": true,
   "useWorkspaces": true,
   "workspaces": [
@@ -42,16 +42,19 @@
     "packages/xs-vat-worker"
   ],
   "devDependencies": {
-    "ava": "^3.11.1",
+    "@typescript-eslint/parser": "^4.1.0",
+    "ava": "^3.12.1",
     "eslint": "^6.8.0",
     "eslint-config-airbnb": "^18.0.1",
     "eslint-config-airbnb-base": "^14.0.0",
     "eslint-config-jessie": "^0.0.4",
     "eslint-config-prettier": "^6.9.0",
     "eslint-plugin-import": "^2.20.0",
+    "eslint-plugin-jsdoc": "^30.4.2",
     "eslint-plugin-jsx-a11y": "^6.2.3",
     "eslint-plugin-prettier": "^3.1.2",
     "lerna": "^3.20.2",
+    "nyc": "^15.1.0",
     "prettier": "^1.18.2"
   },
   "engines": {
@@ -69,6 +72,7 @@
     "lint": "yarn workspaces run lint-check",
     "test": "yarn workspaces run test",
     "build": "yarn workspaces run build",
+    "postinstall": "patch-package",
     "patch-package": "patch-package"
   },
   "dependencies": {

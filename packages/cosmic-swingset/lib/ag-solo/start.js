@@ -10,13 +10,17 @@ import anylogger from 'anylogger';
 // import connect from 'lotion-connect';
 // import djson from 'deterministic-json';
 
+import { assert, details } from '@agoric/assert';
 import {
   loadBasedir,
   loadSwingsetConfigFile,
   buildCommand,
-  buildVatController,
+  swingsetIsInitialized,
+  initializeSwingset,
+  makeSwingsetController,
   buildMailboxStateMap,
   buildMailbox,
+  buildPlugin,
   buildTimer,
 } from '@agoric/swingset-vat';
 import { getBestSwingStore } from '../check-lmdb';
@@ -37,9 +41,10 @@ let swingSetRunning = false;
 
 const fsWrite = promisify(fs.write);
 const fsClose = promisify(fs.close);
+const mkdir = promisify(fs.mkdir);
 const rename = promisify(fs.rename);
-const unlink = promisify(fs.unlink);
 const symlink = promisify(fs.symlink);
+const unlink = promisify(fs.unlink);
 
 async function atomicReplaceFile(filename, contents) {
   const info = await new Promise((resolve, reject) => {
@@ -87,24 +92,63 @@ async function buildSwingset(
   const mb = buildMailbox(mbs);
   const cm = buildCommand(broadcast);
   const timer = buildTimer();
+  const withInputQueue = makeWithQueue();
+  const queueThunkForKernel = withInputQueue(async thunk => {
+    thunk();
+    // eslint-disable-next-line no-use-before-define
+    await processKernel();
+  });
+
+  const pluginDir = path.resolve('./plugins');
+  await mkdir(pluginDir, { recursive: true });
+  const pluginsPrefix = `${pluginDir}${path.sep}`;
+  const pluginRequire = mod => {
+    // Ensure they can't traverse out of the plugins prefix.
+    const pluginFile = path.resolve(pluginsPrefix, mod);
+    assert(
+      pluginFile.startsWith(pluginsPrefix),
+      details`Cannot load ${pluginFile} plugin; outside of ${pluginDir}`,
+    );
+
+    // eslint-disable-next-line import/no-dynamic-require,global-require
+    return require(pluginFile);
+  };
+
+  const plugin = buildPlugin(pluginDir, pluginRequire, queueThunkForKernel);
 
   let config = loadSwingsetConfigFile(`${vatsDir}/solo-config.json`);
   if (config === null) {
     config = loadBasedir(vatsDir);
   }
-  config.devices = [
-    ['mailbox', mb.srcPath, mb.endowments],
-    ['command', cm.srcPath, cm.endowments],
-    ['timer', timer.srcPath, timer.endowments],
-  ];
+  config.devices = {
+    mailbox: {
+      sourceSpec: mb.srcPath,
+    },
+    command: {
+      sourceSpec: cm.srcPath,
+    },
+    timer: {
+      sourceSpec: timer.srcPath,
+    },
+    plugin: {
+      sourceSpec: plugin.srcPath,
+    },
+  };
+  const deviceEndowments = {
+    mailbox: { ...mb.endowments },
+    command: { ...cm.endowments },
+    timer: { ...timer.endowments },
+    plugin: { ...plugin.endowments },
+  };
 
   const tempdir = path.resolve(kernelStateDBDir, 'check-lmdb-tempdir');
   const { openSwingStore } = getBestSwingStore(tempdir);
   const { storage, commit } = openSwingStore(kernelStateDBDir);
 
-  const controller = await buildVatController(config, argv, {
-    hostStorage: storage,
-  });
+  if (!swingsetIsInitialized(storage)) {
+    await initializeSwingset(config, argv, storage);
+  }
+  const controller = await makeSwingsetController(storage, deviceEndowments);
 
   async function saveState() {
     const ms = JSON.stringify(mbs.exportToData());
@@ -123,8 +167,6 @@ async function buildSwingset(
       deliverOutbound();
     }
   }
-
-  const withInputQueue = makeWithQueue();
 
   // Use the input queue to make sure it doesn't overlap with
   // other inbound messages.
@@ -215,6 +257,10 @@ async function buildSwingset(
       intervalMillis = interval;
       setTimeout(queuedMoveTimeForward, intervalMillis);
     },
+    resetOutdatedState: withInputQueue(() => {
+      plugin.reset();
+      return processKernel();
+    }),
   };
 }
 
@@ -251,6 +297,7 @@ export default async function start(basedir, argv) {
     deliverInboundCommand,
     deliverOutbound,
     startTimer,
+    resetOutdatedState,
   } = d;
 
   let hostport;
@@ -305,6 +352,7 @@ export default async function start(basedir, argv) {
 
   // Start timer here!
   startTimer(1200);
+  resetOutdatedState();
 
   // Remove wallet traces.
   await unlink('html/wallet').catch(_ => {});

@@ -6,6 +6,7 @@ import initMain from './init';
 import installMain from './install';
 import setDefaultsMain from './set-defaults';
 import startMain from './start';
+import walletMain from './open';
 
 const DEFAULT_DAPP_TEMPLATE = 'dapp-encouragement';
 const DEFAULT_DAPP_URL_BASE = 'git://github.com/Agoric/';
@@ -61,6 +62,30 @@ const main = async (progname, rawArgs, powers) => {
     });
 
   program
+    .command('open')
+    .description('launch the Agoric UI')
+    .option(
+      '--hostport <host:port>',
+      'host and port to connect to VM',
+      '127.0.0.1:8000',
+    )
+    .option('--no-browser', `just display the URL, don't open a browser`)
+    .option(
+      '--repl [yes | only | no]',
+      'whether to show the Read-eval-print loop [yes]',
+      value => {
+        if (['yes', 'only', 'no'].includes(value)) {
+          return value;
+        }
+        throw TypeError(`--repl must be one of 'yes', 'no', or 'only'`);
+      },
+    )
+    .action(async cmd => {
+      const opts = { ...program.opts(), ...cmd.opts() };
+      return subMain(walletMain, ['wallet'], opts);
+    });
+
+  program
     .command('init <project>')
     .description('create a new Dapp directory named <project>')
     .option(
@@ -106,7 +131,14 @@ const main = async (progname, rawArgs, powers) => {
 
   program
     .command('deploy [script...]')
-    .description('run a deployment script against the local Agoric VM')
+    .description(
+      'run a deployment script with all your user privileges against the local Agoric VM',
+    )
+    .option(
+      '--allow-unsafe-plugins',
+      `CAREFUL: installed Agoric VM plugins will also have all your user's privileges`,
+      false,
+    )
     .option(
       '--hostport <host:port>',
       'host and port to connect to VM',

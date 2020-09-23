@@ -1,6 +1,6 @@
 {
   "name": "@agoric/zoe",
-  "version": "0.7.0",
+  "version": "0.9.1-dev.2",
   "description": "Zoe: the Smart Contract Framework for Offer Enforcement",
   "main": "src/zoeService/zoe.js",
   "engines": {
@@ -8,11 +8,13 @@
   },
   "scripts": {
     "build": "yarn build-zcfBundle",
-    "test": "yarn build && tap --no-coverage --jobs=1 --timeout 600 'test/**/test-*.js'",
+    "test": "ava --verbose",
+    "test:nyc": "nyc ava",
     "build-zcfBundle": "node -r esm scripts/build-zcfBundle.js",
     "lint-fix": "yarn lint --fix",
     "lint-check": "yarn lint",
-    "lint": "yarn lint:types && eslint '**/*.js'",
+    "lint": "yarn lint:types && yarn lint:eslint",
+    "lint:eslint": "eslint '**/*.js'",
     "lint:types": "tsc -p jsconfig.json",
     "lint-fix-jessie": "eslint -c '.eslintrc-jessie.js' --fix '**/*.js'",
     "lint-check-jessie": "eslint -c '.eslintrc-jessie.js' '**/*.js'"
@@ -35,39 +37,50 @@
   },
   "homepage": "https://github.com/Agoric/agoric-sdk#readme",
   "dependencies": {
-    "@agoric/assert": "^0.0.8",
-    "@agoric/ertp": "^0.6.0",
-    "@agoric/eventual-send": "^0.9.3",
-    "@agoric/import-bundle": "^0.0.8",
-    "@agoric/marshal": "^0.2.3",
+    "@agoric/assert": "^0.0.11-dev.2",
+    "@agoric/bundle-source": "^1.1.9-dev.2",
+    "@agoric/ertp": "^0.7.2-dev.2",
+    "@agoric/eventual-send": "^0.11.1-dev.2",
+    "@agoric/import-bundle": "^0.0.11-dev.2",
+    "@agoric/marshal": "^0.2.6-dev.2",
     "@agoric/nat": "^2.0.1",
-    "@agoric/notifier": "^0.1.3",
-    "@agoric/promise-kit": "^0.1.3",
-    "@agoric/same-structure": "^0.0.8",
-    "@agoric/store": "^0.2.0",
-    "@agoric/transform-metering": "^1.3.0",
-    "@agoric/weak-store": "^0.0.8",
-    "@agoric/bundle-source": "^1.1.6"
+    "@agoric/notifier": "^0.2.2-dev.2",
+    "@agoric/promise-kit": "^0.1.6-dev.2",
+    "@agoric/same-structure": "^0.0.11-dev.2",
+    "@agoric/store": "^0.2.3-dev.2",
+    "@agoric/transform-metering": "^1.3.3-dev.2",
+    "@agoric/weak-store": "^0.0.11-dev.2"
   },
   "devDependencies": {
-    "@agoric/install-metering-and-ses": "^0.1.1",
-    "@agoric/install-ses": "^0.2.0",
-    "@agoric/swingset-vat": "^0.6.0",
+    "@agoric/install-metering-and-ses": "^0.1.4-dev.2",
+    "@agoric/install-ses": "^0.3.2-dev.2",
+    "@agoric/swingset-vat": "^0.8.1-dev.2",
+    "ava": "^3.12.1",
     "esm": "^3.2.25",
-    "tap": "^14.10.5",
-    "tape": "^4.11.0",
-    "tape-promise": "^4.0.0"
+    "nyc": "^15.1.0"
   },
   "files": [
     "src/",
-    "*.js",
+    "contractFacet.js",
+    "exported.js",
     "NEWS.md"
   ],
+  "ava": {
+    "files": [
+      "test/**/test-*.js"
+    ],
+    "require": [
+      "esm"
+    ],
+    "timeout": "10m"
+  },
   "eslintConfig": {
     "extends": [
       "airbnb-base",
-      "plugin:prettier/recommended"
+      "plugin:prettier/recommended",
+      "plugin:jsdoc/recommended"
     ],
+    "parser": "@typescript-eslint/parser",
     "env": {
       "es6": true
     },
@@ -98,7 +111,13 @@
       "no-unused-expressions": "off",
       "no-loop-func": "off",
       "no-inner-declarations": "off",
-      "import/prefer-default-export": "off"
+      "import/prefer-default-export": "off",
+      "jsdoc/no-undefined-types": "off",
+      "jsdoc/require-jsdoc": "off",
+      "jsdoc/require-property-description": "off",
+      "jsdoc/require-param-description": "off",
+      "jsdoc/require-returns": "off",
+      "jsdoc/require-returns-description": "off"
     }
   },
   "eslintIgnore": [

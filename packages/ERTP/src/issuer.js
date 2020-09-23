@@ -5,6 +5,7 @@
 import { assert, details } from '@agoric/assert';
 import makeStore from '@agoric/weak-store';
 import { E } from '@agoric/eventual-send';
+import { Remotable } from '@agoric/marshal';
 import { isPromise } from '@agoric/promise-kit';
 
 import { makeAmountMath, MathKind } from './amountMath';
@@ -19,7 +20,7 @@ import './types';
 function makeIssuerKit(allegedName, amountMathKind = MathKind.NAT) {
   assert.typeof(allegedName, 'string');
 
-  const brand = harden({
+  const brand = Remotable(`Alleged: ${allegedName} brand`, undefined, {
     isMyIssuer: allegedIssuerP => {
       return E.when(allegedIssuerP, allegedIssuer => {
         // eslint-disable-next-line no-use-before-define
@@ -42,7 +43,7 @@ function makeIssuerKit(allegedName, amountMathKind = MathKind.NAT) {
   }
 
   const makePayment = () =>
-    harden({
+    Remotable(`Alleged: ${allegedName} payment`, undefined, {
       getAllegedBrand: () => brand,
     });
 
@@ -63,7 +64,7 @@ function makeIssuerKit(allegedName, amountMathKind = MathKind.NAT) {
    */
   const makePurse = () => {
     /** @type {Purse} */
-    const purse = harden({
+    const purse = Remotable(`Alleged: ${allegedName} purse`, undefined, {
       deposit: (srcPayment, optAmount = undefined) => {
         if (isPromise(srcPayment)) {
           throw new TypeError(
@@ -105,8 +106,12 @@ function makeIssuerKit(allegedName, amountMathKind = MathKind.NAT) {
       },
       getCurrentAmount: () => purseLedger.get(purse),
       getAllegedBrand: () => brand,
-      makeDepositFacet: () => harden({ receive: purse.deposit }),
+      // eslint-disable-next-line no-use-before-define
+      getDepositFacet: () => depositFacet,
     });
+
+    const depositFacet = harden({ receive: purse.deposit });
+
     return purse;
   };
 
@@ -175,7 +180,7 @@ function makeIssuerKit(allegedName, amountMathKind = MathKind.NAT) {
   };
 
   /** @type {Issuer} */
-  const issuer = harden({
+  const issuer = Remotable(`Alleged: ${allegedName} issuer`, undefined, {
     getBrand: () => brand,
     getAllegedName: () => allegedName,
     getAmountMathKind: () => amountMathKind,
@@ -278,7 +283,7 @@ function makeIssuerKit(allegedName, amountMathKind = MathKind.NAT) {
   });
 
   /** @type {Mint} */
-  const mint = harden({
+  const mint = Remotable(`Alleged: ${allegedName} mint`, undefined, {
     getIssuer: () => issuer,
     mintPayment: newAmount => {
       newAmount = amountMath.coerce(newAmount);

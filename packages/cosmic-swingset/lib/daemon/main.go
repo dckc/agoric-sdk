@@ -24,7 +24,7 @@ import (
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
 	"github.com/cosmos/cosmos-sdk/x/staking"
 
-	"github.com/Agoric/agoric-sdk/packages/cosmic-swingset/app"
+	"github.com/Agoric/cosmic-swingset/app"
 )
 
 const flagInvCheckPeriod = "inv-check-period"
@@ -108,7 +108,11 @@ func makeNewApp(sendToController Sender) func(logger log.Logger, db dbm.DB, trac
 		return app.NewAgoricApp(
 			sendToController, logger, db, traceStore, true, invCheckPeriod, skipUpgradeHeights,
 			viper.GetString(flags.FlagHome),
-			baseapp.SetPruning(store.NewPruningOptionsFromString(viper.GetString("pruning"))),
+			// FIGME: instead use:
+			// baseapp.SetPruning(store.NewPruningOptionsFromString(viper.GetString("pruning"))),
+			// but for now, the default cosmos-sdk pruning doesn't keep the last
+			// N committed blocks on disk, so we only rarely can recover from restarts.
+			baseapp.SetPruning(store.PruneNothing),
 			baseapp.SetMinGasPrices(viper.GetString(server.FlagMinGasPrices)),
 			baseapp.SetHaltHeight(viper.GetUint64(server.FlagHaltHeight)),
 			baseapp.SetHaltTime(viper.GetUint64(server.FlagHaltTime)),

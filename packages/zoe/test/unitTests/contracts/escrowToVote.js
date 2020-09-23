@@ -47,9 +47,13 @@ const start = zcf => {
   };
 
   const voteHandler = voterSeat => {
+    assertProposalShape(voterSeat, {
+      give: { Assets: null },
+    });
     const voter = harden({
       /**
        * Vote on a particular issue
+       *
        * @param {string} response - 'YES' || 'NO'
        */
       vote: response => {
@@ -70,10 +74,6 @@ const start = zcf => {
     });
     return voter;
   };
-
-  const expectedVoterProposal = harden({
-    give: { Assets: null },
-  });
 
   const creatorFacet = harden({
     closeElection: () => {
@@ -100,10 +100,7 @@ const start = zcf => {
     },
     makeVoterInvitation: () => {
       assert(electionOpen, 'the election is closed');
-      return zcf.makeInvitation(
-        assertProposalShape(voteHandler, expectedVoterProposal),
-        'voter',
-      );
+      return zcf.makeInvitation(voteHandler, 'voter');
     },
   });
 

@@ -1,4 +1,3 @@
-/* global harden */
 import { assert, details } from '@agoric/assert';
 import { insistMessage } from '../message';
 import { insistKernelType, parseKernelSlot } from './parseKernelSlots';
@@ -12,7 +11,7 @@ import { deleteCListEntryIfEasy } from './cleanup';
  * objects
  */
 function makeTranslateKernelDeliveryToVatDelivery(vatID, kernelKeeper) {
-  const vatKeeper = kernelKeeper.allocateVatKeeperIfNeeded(vatID);
+  const vatKeeper = kernelKeeper.getVatKeeper(vatID);
   const { mapKernelSlotToVatSlot } = vatKeeper;
 
   // msg is { method, args, result }, all slots are kernel-centric
@@ -61,6 +60,7 @@ function makeTranslateKernelDeliveryToVatDelivery(vatID, kernelKeeper) {
       vp.slot = mapKernelSlotToVatSlot(kp.slot);
       vatKeeper.deleteCListEntry(kpid, vpid);
     } else if (kp.state === 'redirected') {
+      // TODO unimplemented
       throw new Error('not implemented yet');
     } else if (kp.state === 'fulfilledToData' || kp.state === 'rejected') {
       vp.data = {
@@ -96,7 +96,7 @@ function makeTranslateKernelDeliveryToVatDelivery(vatID, kernelKeeper) {
  * objects
  */
 function makeTranslateVatSyscallToKernelSyscall(vatID, kernelKeeper) {
-  const vatKeeper = kernelKeeper.allocateVatKeeperIfNeeded(vatID);
+  const vatKeeper = kernelKeeper.getVatKeeper(vatID);
   const { mapVatSlotToKernelSlot } = vatKeeper;
 
   function translateSend(targetSlot, method, args, resultSlot) {
@@ -147,6 +147,12 @@ function makeTranslateVatSyscallToKernelSyscall(vatID, kernelKeeper) {
     const { type } = parseKernelSlot(dev);
     if (type !== 'device') {
       throw new Error(`doCallNow must target a device, not ${dev}`);
+    }
+    for (const slot of args.slots) {
+      assert(
+        parseVatSlot(slot).type !== 'promise',
+        `syscall.callNow() args cannot include promises like ${slot}`,
+      );
     }
     const kernelSlots = args.slots.map(slot => mapVatSlotToKernelSlot(slot));
     const kernelData = harden({ ...args, slots: kernelSlots });
@@ -240,7 +246,7 @@ function makeTranslateKernelSyscallResultToVatSyscallResult(
   vatID,
   kernelKeeper,
 ) {
-  const vatKeeper = kernelKeeper.allocateVatKeeperIfNeeded(vatID);
+  const vatKeeper = kernelKeeper.getVatKeeper(vatID);
 
   const { mapKernelSlotToVatSlot } = vatKeeper;
 

@@ -88,6 +88,7 @@ export async function makeWallet({
 
   /**
    * The default Zoe invite purse is used to make an offer.
+   *
    * @type {Purse}
    */
   let zoeInvitePurse;
@@ -111,11 +112,12 @@ export async function makeWallet({
   }
 
   const noOp = () => {};
-  const identityFn = slot => slot;
+  const identitySlotToValFn = (slot, _) => slot;
+
   // Instead of { body, slots }, fill the slots. This is useful for
   // display but not for data processing, since the special identifier
   // @qclass is lost.
-  const { unserialize: fillInSlots } = makeMarshal(noOp, identityFn);
+  const { unserialize: fillInSlots } = makeMarshal(noOp, identitySlotToValFn);
 
   const {
     notifier: pursesNotifier,
@@ -287,7 +289,7 @@ export async function makeWallet({
   const {
     updater: issuersUpdater,
     notifier: issuersNotifier,
-  } = /** @type {NotifierRecord<[Petname, BrandRecord][]>} */ (makeNotifierKit(
+  } = /** @type {NotifierRecord<Array<[Petname, BrandRecord]>>} */ (makeNotifierKit(
     [],
   ));
 
@@ -473,7 +475,9 @@ export async function makeWallet({
   const {
     updater: contactsUpdater,
     notifier: contactsNotifier,
-  } = /** @type {NotifierRecord<[Petname, Contact][]>} */ (makeNotifierKit([]));
+  } = /** @type {NotifierRecord<Array<[Petname, Contact]>>} */ (makeNotifierKit(
+    [],
+  ));
 
   const addContact = async (petname, actions) => {
     const already = await E(board).has(actions);
@@ -656,7 +660,11 @@ export async function makeWallet({
     dappsUpdater.updateState([...dappOrigins.values()]);
   }
 
-  async function waitForDappApproval(suggestedPetname, origin) {
+  async function waitForDappApproval(
+    suggestedPetname,
+    origin,
+    notYetEnabled = () => {},
+  ) {
     let dappRecord;
     if (dappOrigins.has(origin)) {
       dappRecord = dappOrigins.get(origin);
@@ -670,6 +678,7 @@ export async function makeWallet({
         petname: suggestedPetname,
         origin,
         approvalP,
+        enable: false,
         actions: {
           setPetname(petname) {
             if (dappRecord.petname === petname) {
@@ -726,6 +735,9 @@ export async function makeWallet({
       dappRecord.actions.disable();
     }
 
+    if (!dappRecord.enable) {
+      notYetEnabled();
+    }
     await dappRecord.approvalP;
     // AWAIT
     // Refetch the origin record.

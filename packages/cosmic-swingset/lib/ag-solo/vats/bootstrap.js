@@ -1,5 +1,3 @@
-/* global harden */
-
 import { allComparable } from '@agoric/same-structure';
 import {
   makeLoopbackProtocolHandler,
@@ -9,41 +7,13 @@ import { E } from '@agoric/eventual-send';
 
 // this will return { undefined } until `ag-solo set-gci-ingress`
 // has been run to update gci.js
+import { makePluginManager } from '@agoric/swingset-vat/src/vats/plugin-manager';
 import { GCI } from './gci';
 import { makeBridgeManager } from './bridge';
 
 const NUM_IBC_PORTS = 3;
 
 console.debug(`loading bootstrap.js`);
-
-function parseArgs(argv) {
-  let ROLE;
-  let gotRoles = false;
-  const hardcodedClientAddresses = [];
-  let giveMeAllTheAgoricPowers = false;
-  argv.forEach(arg => {
-    const match = arg.match(/^--role=(.*)$/);
-    if (match) {
-      if (gotRoles) {
-        throw new Error(`must assign only one role, saw ${ROLE}, ${match[1]}`);
-      }
-      [, ROLE] = match;
-      gotRoles = true;
-    } else if (arg === `--give-me-all-the-agoric-powers`) {
-      console.warn(`Giving all the Agoric powers to the client!`);
-      giveMeAllTheAgoricPowers = true;
-    } else if (arg.match(/^-/)) {
-      throw Error(`Unrecognized option ${arg}`);
-    } else {
-      hardcodedClientAddresses.push(arg);
-    }
-  });
-  if (!gotRoles) {
-    ROLE = 'client';
-  }
-
-  return { ROLE, giveMeAllTheAgoricPowers, hardcodedClientAddresses };
-}
 
 // Used for coordinating on an index in comms for the provisioning service
 const PROVISIONER_INDEX = 1;
@@ -238,13 +208,19 @@ export function buildRootObject(vatPowers, vatParameters) {
   // objects that live in the client's solo vat. Some services should only
   // be in the DApp environment (or only in end-user), but we're not yet
   // making a distinction, so the user also gets them.
-  async function createLocalBundle(vats) {
+  async function createLocalBundle(vats, devices) {
     // This will eventually be a vat spawning service. Only needed by dev
     // environments.
     const spawner = E(vats.host).makeHost();
 
     // Needed for DApps, maybe for user clients.
     const uploads = E(vats.uploads).getUploads();
+
+    // Only create the plugin manager if the device exists.
+    let plugin;
+    if (devices.plugin) {
+      plugin = makePluginManager(devices.plugin, vatPowers);
+    }
 
     // This will allow dApp developers to register in their api/deploy.js
     const httpRegCallback = {
@@ -257,11 +233,11 @@ export function buildRootObject(vatPowers, vatParameters) {
       registerAPIHandler(handler) {
         return E(vats.http).registerURLHandler(handler, '/api');
       },
-      async registerWallet(wallet, handler, bridgeHandler) {
+      async registerWallet(wallet, privateWallet, privateWalletBridge) {
         await Promise.all([
-          E(vats.http).registerURLHandler(handler, '/private/wallet'),
+          E(vats.http).registerURLHandler(privateWallet, '/private/wallet'),
           E(vats.http).registerURLHandler(
-            bridgeHandler,
+            privateWalletBridge,
             '/private/wallet-bridge',
           ),
           E(vats.http).setWallet(wallet),
@@ -271,6 +247,7 @@ export function buildRootObject(vatPowers, vatParameters) {
 
     return allComparable(
       harden({
+        ...(plugin ? { plugin } : {}),
         uploads,
         spawner,
         network: vats.network,
@@ -288,7 +265,7 @@ export function buildRootObject(vatPowers, vatParameters) {
         ROLE,
         giveMeAllTheAgoricPowers,
         hardcodedClientAddresses,
-      } = parseArgs(vatParameters.argv);
+      } = vatParameters.argv;
 
       async function addRemote(addr) {
         const { transmitter, setReceiver } = await E(vats.vattp).addRemote(
@@ -345,7 +322,7 @@ export function buildRootObject(vatPowers, vatParameters) {
             GCI,
             PROVISIONER_INDEX,
           );
-          const localBundle = await createLocalBundle(vats);
+          const localBundle = await createLocalBundle(vats, devices);
           await E(vats.http).setPresences(localBundle);
           const bundle = await E(demoProvider).getDemoBundle();
           await E(vats.http).setPresences(localBundle, bundle, {

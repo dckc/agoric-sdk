@@ -11,7 +11,7 @@ docker-show-fat:
 	docker build --file=Dockerfile.show-fat ../..
 
 docker-build: docker-build-base docker-build-sdk docker-build-solo \
-	docker-build-pserver docker-build-setup docker-build-vagrant
+	docker-build-setup docker-build-deployment
 
 docker-build-sdk:
 	docker build -t $(REPOSITORY_SDK):latest --file=Dockerfile.sdk ../..
@@ -25,17 +25,14 @@ docker-build-base:
 	  echo "$$hash$$dirty" > $(SS)lib/git-revision.txt
 	docker build -t $(REPOSITORY):latest $(SS)
 
-docker-build-pserver:
-	docker build -t $(REPOSITORY)-pserver:latest $(SS)provisioning-server
-
 docker-build-solo:
 	docker build -t $(REPOSITORY)-solo:latest $(SS)lib/ag-solo
 
-docker-build-vagrant:
-	docker build -t agoric/vagrant-debian:latest --file=../../vagrant/Dockerfile ../../vagrant
+docker-build-deployment:
+	docker build -t agoric/deployment:latest --file=Dockerfile.deployment ./docker
 
 docker-push: docker-push-base docker-push-solo docker-push-setup \
-	docker-push-pserver docker-push-ibc-alpha docker-push-vagrant
+	docker-push-ibc-alpha docker-push-deployment
 
 # ./docker is an emptyish directory.
 docker-build-ibc-alpha:
@@ -54,15 +51,10 @@ docker-push-base:
 	$(DONT_PUSH_LATEST) docker push $(REPOSITORY_SDK):latest
 	docker push $(REPOSITORY_SDK):$(TAG)
 
-docker-push-pserver:
-	docker tag $(REPOSITORY)-pserver:latest $(REPOSITORY)-pserver:$(TAG)
-	$(DONT_PUSH_LATEST) docker push $(REPOSITORY)-pserver:latest
-	docker push $(REPOSITORY)-pserver:$(TAG)
-
 docker-push-solo:
 	docker tag $(REPOSITORY)-solo:latest $(REPOSITORY)-solo:$(TAG)
 	$(DONT_PUSH_LATEST) docker push $(REPOSITORY)-solo:latest
 	docker push $(REPOSITORY)-solo:$(TAG)
 
-docker-push-vagrant:
-	$(DONT_PUSH_LATEST) docker push agoric/vagrant-debian:latest
+docker-push-deployment:
+	$(DONT_PUSH_LATEST) docker push agoric/deployment:latest

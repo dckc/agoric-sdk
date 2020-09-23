@@ -4,10 +4,61 @@
     <title>Agoric Wallet Bridge</title>
   </head>
   <body>
-    <p>This bridge is only for dApps to reach your wallet.  It contains no user-servicable parts.</p>
+    <style>
+      html, body {
+        height: 100%;
+        padding: 0;
+        margin: 0;
+      }
 
+      * {
+        box-sizing: border-box;
+        padding: 0;
+        margin: 0;
+      }
+
+      #launchWallet {
+        height: 100%;
+        width: 100%;
+        background-color: white;
+      }
+
+      .pulse {
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0% {
+          background-color: white;
+        }
+        50% {
+          background-color: #ab2328;
+        }
+        100% {
+          background-color: white;
+        }
+      }
+    </style>
+
+    <button id="launchWallet">Agoric Wallet</button>
     <script type="text/javascript">
-      const walletPublicURL = new URL('/private/wallet-bridge', window.origin.replace(/^http/, 'ws')).href;
+      launchWallet.addEventListener('click', ev => {
+        launchWallet.classList.remove('pulse');
+        alert(`\
+Use the:
+
+   agoric open
+
+command-line request to open the Agoric wallet.`);
+      });
+
+      const popupWallet = () => {
+        launchWallet.classList.add('pulse');
+      };
+
+      const walletPublicURL = new URL(
+        `/private/wallet-bridge${location.search}`,
+        window.origin.replace(/^http/, 'ws'),
+      ).href;
       const ws = new WebSocket(walletPublicURL);
       const wsQueue = [];
       const dappQueue = [];
@@ -21,6 +72,10 @@
         }
         if (!obj || typeof obj.type !== 'string') {
           return;
+        }
+        if (obj.type === 'walletNeedDappApproval') {
+          // Let them approve.
+          popupWallet();
         }
         if (origin === undefined) {
           dappQueue.push(obj);
@@ -37,13 +92,14 @@
         }
         while (wsQueue.length) {
           // The queued messages are raw objects, so JSONify.
-          ws.send(JSON.stringify(wsQueue.shift()));
+          const obj = wsQueue.shift();
+          ws.send(JSON.stringify(obj));
+          if (obj.type === 'walletAddOffer') {
+            // Just pop up our corresponding UI.
+            popupWallet();
+          }
         }
       });
-
-      // Get the dapp's suggested petname, if there is one.
-      const sp = new URLSearchParams(location.search);
-      let suggestedDappPetname = sp.get('suggestedDappPetname');
 
       window.addEventListener('message', ev => {
         // console.log('inbound', ev.data);
@@ -53,8 +109,6 @@
         if (origin === undefined) {
           // First-come, first-serve.
           origin = ev.origin;
-          // Default the petname, if there isn't a better one.
-          suggestedDappPetname = suggestedDappPetname || origin;
           while (dappQueue.length) {
             const dappObj = dappQueue.shift();
             if (window.parent !== window) {
@@ -66,7 +120,6 @@
         const obj = {
           ...ev.data,
           dappOrigin: origin,
-          suggestedDappPetname,
         };
         if (ws.readyState !== ws.OPEN) {
           // console.log('queuing', obj);
@@ -74,6 +127,10 @@
         } else {
           // console.log('sending', obj);
           ws.send(JSON.stringify(obj));
+          if (obj.type === 'walletAddOffer') {
+            // Just pop up our corresponding UI.
+            popupWallet();
+          }
         }
       });
     </script>

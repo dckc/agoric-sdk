@@ -1,5 +1,3 @@
-/* global harden */
-
 import '@agoric/install-ses';
 import test from 'ava';
 import {
@@ -250,6 +248,24 @@ function duplicateKeeper(getState) {
   return makeKernelKeeper(enhancedCrankBuffer);
 }
 
+test('hostStorage param guards', async t => {
+  const { kstorage, commitCrank } = buildKeeperStorageInMemory();
+  kstorage.set('foo', true);
+  t.throws(commitCrank, { message: /must be a string/ });
+  kstorage.set(true, 'foo');
+  t.throws(commitCrank, { message: /must be a string/ });
+  kstorage.has(true);
+  t.throws(commitCrank, { message: /must be a string/ });
+  kstorage.getKeys('foo', true);
+  t.throws(commitCrank, { message: /must be a string/ });
+  kstorage.getKeys(true, 'foo');
+  t.throws(commitCrank, { message: /must be a string/ });
+  kstorage.get(true);
+  t.throws(commitCrank, { message: /must be a string/ });
+  kstorage.delete(true);
+  t.throws(commitCrank, { message: /must be a string/ });
+});
+
 test('kernel state', async t => {
   const { kstorage, getState, commitCrank } = buildKeeperStorageInMemory();
   const k = makeKernelKeeper(kstorage);
@@ -298,12 +314,18 @@ test('kernelKeeper vat names', async t => {
     ['vat.name.vatname5', 'v1'],
     ['vat.name.Frank', 'v2'],
   ]);
-  t.deepEqual(k.getAllVatNames(), ['Frank', 'vatname5']);
+  t.deepEqual(k.getStaticVats(), [
+    ['Frank', 'v2'],
+    ['vatname5', 'v1'],
+  ]);
   t.is(k.getVatIDForName('Frank'), v2);
   t.is(k.allocateVatIDForNameIfNeeded('Frank'), v2);
 
   const k2 = duplicateKeeper(getState);
-  t.deepEqual(k2.getAllVatNames(), ['Frank', 'vatname5']);
+  t.deepEqual(k.getStaticVats(), [
+    ['Frank', 'v2'],
+    ['vatname5', 'v1'],
+  ]);
   t.is(k2.getVatIDForName('Frank'), v2);
   t.is(k2.allocateVatIDForNameIfNeeded('Frank'), v2);
 });
@@ -333,12 +355,18 @@ test('kernelKeeper device names', async t => {
     ['device.name.devicename5', 'd7'],
     ['device.name.Frank', 'd8'],
   ]);
-  t.deepEqual(k.getAllDeviceNames(), ['Frank', 'devicename5']);
+  t.deepEqual(k.getDevices(), [
+    ['Frank', 'd8'],
+    ['devicename5', 'd7'],
+  ]);
   t.is(k.getDeviceIDForName('Frank'), d8);
   t.is(k.allocateDeviceIDForNameIfNeeded('Frank'), d8);
 
   const k2 = duplicateKeeper(getState);
-  t.deepEqual(k2.getAllDeviceNames(), ['Frank', 'devicename5']);
+  t.deepEqual(k.getDevices(), [
+    ['Frank', 'd8'],
+    ['devicename5', 'd7'],
+  ]);
   t.is(k2.getDeviceIDForName('Frank'), d8);
   t.is(k2.allocateDeviceIDForNameIfNeeded('Frank'), d8);
 });
@@ -387,6 +415,7 @@ test('kernelKeeper promises', async t => {
   const p1 = k.addKernelPromiseForVat('v4');
   t.deepEqual(k.getKernelPromise(p1), {
     state: 'unresolved',
+    policy: 'ignore',
     refCount: 0,
     queue: [],
     subscribers: [],
@@ -400,6 +429,7 @@ test('kernelKeeper promises', async t => {
 
   t.deepEqual(k2.getKernelPromise(p1), {
     state: 'unresolved',
+    policy: 'ignore',
     refCount: 0,
     queue: [],
     subscribers: [],
@@ -410,6 +440,7 @@ test('kernelKeeper promises', async t => {
   k.clearDecider(p1);
   t.deepEqual(k.getKernelPromise(p1), {
     state: 'unresolved',
+    policy: 'ignore',
     refCount: 0,
     queue: [],
     subscribers: [],
@@ -420,6 +451,7 @@ test('kernelKeeper promises', async t => {
   k2 = duplicateKeeper(getState);
   t.deepEqual(k2.getKernelPromise(p1), {
     state: 'unresolved',
+    policy: 'ignore',
     refCount: 0,
     queue: [],
     subscribers: [],
@@ -429,6 +461,7 @@ test('kernelKeeper promises', async t => {
   k.setDecider(p1, 'v7');
   t.deepEqual(k.getKernelPromise(p1), {
     state: 'unresolved',
+    policy: 'ignore',
     refCount: 0,
     queue: [],
     subscribers: [],
@@ -525,8 +558,8 @@ test('vatKeeper', async t => {
   k.createStartingKernelState();
 
   const v1 = k.allocateVatIDForNameIfNeeded('name1');
-  const vk = k.allocateVatKeeperIfNeeded(v1);
-  t.is(vk, k.allocateVatKeeperIfNeeded(v1));
+  const vk = k.allocateVatKeeper(v1);
+  t.is(vk, k.getVatKeeper(v1));
 
   const vatExport1 = 'o+4';
   const kernelExport1 = vk.mapVatSlotToKernelSlot(vatExport1);
@@ -535,7 +568,7 @@ test('vatKeeper', async t => {
   t.is(vk.mapKernelSlotToVatSlot(kernelExport1), vatExport1);
 
   commitCrank();
-  let vk2 = duplicateKeeper(getState).allocateVatKeeperIfNeeded(v1);
+  let vk2 = duplicateKeeper(getState).allocateVatKeeper(v1);
   t.is(vk2.mapVatSlotToKernelSlot(vatExport1), kernelExport1);
   t.is(vk2.mapKernelSlotToVatSlot(kernelExport1), vatExport1);
 
@@ -546,7 +579,7 @@ test('vatKeeper', async t => {
   t.is(vk.mapVatSlotToKernelSlot(vatImport2), kernelImport2);
 
   commitCrank();
-  vk2 = duplicateKeeper(getState).allocateVatKeeperIfNeeded(v1);
+  vk2 = duplicateKeeper(getState).allocateVatKeeper(v1);
   t.is(vk2.mapKernelSlotToVatSlot(kernelImport2), vatImport2);
   t.is(vk2.mapVatSlotToKernelSlot(vatImport2), kernelImport2);
 });

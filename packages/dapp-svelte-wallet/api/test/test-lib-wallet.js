@@ -53,8 +53,8 @@ async function setupTest() {
   const autoswapBundle = await bundleSource(autoswapContractRoot);
   const autoswapInstallationHandle = await zoe.install(autoswapBundle);
   const autoswapIssuerKeywordRecord = harden({
-    TokenA: moolaBundle.issuer,
-    TokenB: simoleanBundle.issuer,
+    Central: moolaBundle.issuer,
+    Secondary: simoleanBundle.issuer,
   });
   const {
     publicFacet: autoswapPublicFacet,
@@ -167,13 +167,14 @@ test('lib-wallet issuer and purse methods', async t => {
     JSON.parse(pursesStateChangeLog[pursesStateChangeLog.length - 1]),
     [
       {
-        brandBoardId: '16679794',
-        depositBoardId: '6043467',
+        brandBoardId: '1667979430',
+        depositBoardId: '604346717',
         brandPetname: 'zoe invite',
         pursePetname: 'Default Zoe invite purse',
         value: [],
         currentAmountSlots: {
-          body: '{"brand":{"@qclass":"slot","index":0},"value":[]}',
+          body:
+            '{"brand":{"@qclass":"slot","iface":"Alleged: Zoe Invitation brand","index":0},"value":[]}',
           slots: [{ kind: 'brand', petname: 'zoe invite' }],
         },
         currentAmount: {
@@ -182,12 +183,13 @@ test('lib-wallet issuer and purse methods', async t => {
         },
       },
       {
-        brandBoardId: '7279951',
+        brandBoardId: '727995140',
         brandPetname: 'moola',
         pursePetname: 'fun money',
         value: 0,
         currentAmountSlots: {
-          body: '{"brand":{"@qclass":"slot","index":0},"value":0}',
+          body:
+            '{"brand":{"@qclass":"slot","iface":"Alleged: moola brand","index":0},"value":0}',
           slots: [{ kind: 'brand', petname: 'moola' }],
         },
         currentAmount: {
@@ -263,7 +265,7 @@ test('lib-wallet dapp suggests issuer, instance, installation petnames', async t
   // invite purse balance is rendered with petnames. We should see
   // unnamed first, then the petnames after those are suggested by
   // the dapp.
-  /** @type {{ makeInvitation(): Invitation }} */
+  /** @type {{ makeInvitation: () => Invitation }} */
   const publicAPI = await E(zoe).getPublicFacet(instance);
   const invite2 = await E(publicAPI).makeInvitation();
   const {
@@ -291,8 +293,8 @@ test('lib-wallet dapp suggests issuer, instance, installation petnames', async t
   t.deepEqual(
     zoeInvitePurseState[0],
     {
-      brandBoardId: '16679794',
-      depositBoardId: '6043467',
+      brandBoardId: '1667979430',
+      depositBoardId: '604346717',
       brandPetname: 'zoe invite',
       pursePetname: 'Default Zoe invite purse',
       value: [
@@ -305,7 +307,7 @@ test('lib-wallet dapp suggests issuer, instance, installation petnames', async t
       ],
       currentAmountSlots: {
         body:
-          '{"brand":{"@qclass":"slot","index":0},"value":[{"description":"getRefund","handle":{"@qclass":"slot","index":1},"instance":{"@qclass":"slot","index":2},"installation":{"@qclass":"slot","index":3}}]}',
+          '{"brand":{"@qclass":"slot","iface":"Alleged: Zoe Invitation brand","index":0},"value":[{"description":"getRefund","handle":{"@qclass":"slot","index":1},"instance":{"@qclass":"slot","index":2},"installation":{"@qclass":"slot","index":3}}]}',
         slots: [
           { kind: 'brand', petname: 'zoe invite' },
           { kind: 'unnamed', petname: 'unnamed-4' },
@@ -370,8 +372,8 @@ test('lib-wallet dapp suggests issuer, instance, installation petnames', async t
   t.deepEqual(
     zoeInvitePurseState2,
     {
-      brandBoardId: '16679794',
-      depositBoardId: '6043467',
+      brandBoardId: '1667979430',
+      depositBoardId: '604346717',
       brandPetname: 'zoe invite',
       pursePetname: 'Default Zoe invite purse',
       value: [
@@ -384,7 +386,7 @@ test('lib-wallet dapp suggests issuer, instance, installation petnames', async t
       ],
       currentAmountSlots: {
         body:
-          '{"brand":{"@qclass":"slot","index":0},"value":[{"description":"getRefund","handle":{"@qclass":"slot","index":1},"instance":{"@qclass":"slot","index":2},"installation":{"@qclass":"slot","index":3}}]}',
+          '{"brand":{"@qclass":"slot","iface":"Alleged: Zoe Invitation brand","index":0},"value":[{"description":"getRefund","handle":{"@qclass":"slot","index":1},"instance":{"@qclass":"slot","index":2},"installation":{"@qclass":"slot","index":3}}]}',
         slots: [
           { kind: 'brand', petname: 'zoe invite' },
           { kind: 'unnamed', petname: 'unnamed-4' },
@@ -417,9 +419,9 @@ test('lib-wallet dapp suggests issuer, instance, installation petnames', async t
     inboxState1,
     {
       id: 'unknown#1588645041696',
-      inviteHandleBoardId: '7279951',
-      instanceHandleBoardId: '3715714',
-      installationHandleBoardId: '14561541',
+      inviteHandleBoardId: '727995140',
+      instanceHandleBoardId: '371571443',
+      installationHandleBoardId: '1456154132',
       proposalTemplate: {},
       requestContext: { dappOrigin: 'unknown' },
       instancePetname: 'automaticRefund',
@@ -469,8 +471,8 @@ test('lib-wallet dapp suggests issuer, instance, installation petnames', async t
   t.deepEqual(
     zoeInvitePurseState3,
     {
-      brandBoardId: '16679794',
-      depositBoardId: '6043467',
+      brandBoardId: '1667979430',
+      depositBoardId: '604346717',
       brandPetname: 'zoe invite',
       pursePetname: 'Default Zoe invite purse',
       value: [
@@ -483,7 +485,7 @@ test('lib-wallet dapp suggests issuer, instance, installation petnames', async t
       ],
       currentAmountSlots: {
         body:
-          '{"brand":{"@qclass":"slot","index":0},"value":[{"description":"getRefund","handle":{"@qclass":"slot","index":1},"instance":{"@qclass":"slot","index":2},"installation":{"@qclass":"slot","index":3}}]}',
+          '{"brand":{"@qclass":"slot","iface":"Alleged: Zoe Invitation brand","index":0},"value":[{"description":"getRefund","handle":{"@qclass":"slot","index":1},"instance":{"@qclass":"slot","index":2},"installation":{"@qclass":"slot","index":3}}]}',
         slots: [
           { kind: 'brand', petname: 'zoe invite' },
           { kind: 'unnamed', petname: 'unnamed-4' },
@@ -515,9 +517,9 @@ test('lib-wallet dapp suggests issuer, instance, installation petnames', async t
     inboxState2,
     {
       id: 'unknown#1588645041696',
-      inviteHandleBoardId: '7279951',
-      instanceHandleBoardId: '3715714',
-      installationHandleBoardId: '14561541',
+      inviteHandleBoardId: '727995140',
+      instanceHandleBoardId: '371571443',
+      installationHandleBoardId: '1456154132',
       proposalTemplate: {},
       requestContext: { dappOrigin: 'unknown' },
       instancePetname: 'automaticRefund',
@@ -589,9 +591,9 @@ test('lib-wallet offer methods', async t => {
     [
       {
         id: 'unknown#1588645041696',
-        inviteHandleBoardId: '7279951',
-        instanceHandleBoardId: '3715714',
-        installationHandleBoardId: '14561541',
+        inviteHandleBoardId: '727995140',
+        instanceHandleBoardId: '371571443',
+        installationHandleBoardId: '1456154132',
         proposalTemplate: {
           give: { Contribution: { pursePetname: 'Fun budget', value: 1 } },
           exit: { onDemand: null },
@@ -618,7 +620,7 @@ test('lib-wallet offer methods', async t => {
   );
   const rawId2 = '1588645230204';
   const id2 = `unknown#${rawId2}`;
-  /** @type {{ makeInvitation(): Invitation}} */
+  /** @type {{ makeInvitation: () => Invitation}} */
   const publicAPI = await E(zoe).getPublicFacet(instance);
   const invite2 = await E(publicAPI).makeInvitation();
   const {
@@ -640,13 +642,14 @@ test('lib-wallet offer methods', async t => {
   t.deepEqual(
     zoeInvitePurseState,
     {
-      brandBoardId: '16679794',
-      depositBoardId: '6043467',
+      brandBoardId: '1667979430',
+      depositBoardId: '604346717',
       brandPetname: 'zoe invite',
       pursePetname: 'Default Zoe invite purse',
       value: [],
       currentAmountSlots: {
-        body: '{"brand":{"@qclass":"slot","index":0},"value":[]}',
+        body:
+          '{"brand":{"@qclass":"slot","iface":"Alleged: Zoe Invitation brand","index":0},"value":[]}',
         slots: [{ kind: 'brand', petname: 'zoe invite' }],
       },
       currentAmount: {
@@ -659,12 +662,13 @@ test('lib-wallet offer methods', async t => {
   t.deepEqual(
     moolaPurseState,
     {
-      brandBoardId: '15326650',
+      brandBoardId: '1532665031',
       brandPetname: 'moola',
       pursePetname: 'Fun budget',
       value: 100,
       currentAmountSlots: {
-        body: '{"brand":{"@qclass":"slot","index":0},"value":100}',
+        body:
+          '{"brand":{"@qclass":"slot","iface":"Alleged: moola brand","index":0},"value":100}',
         slots: [{ kind: 'brand', petname: 'moola' }],
       },
       currentAmount: {
@@ -680,9 +684,9 @@ test('lib-wallet offer methods', async t => {
     [
       {
         id: 'unknown#1588645041696',
-        inviteHandleBoardId: '7279951',
-        instanceHandleBoardId: '3715714',
-        installationHandleBoardId: '14561541',
+        inviteHandleBoardId: '727995140',
+        instanceHandleBoardId: '371571443',
+        installationHandleBoardId: '1456154132',
         proposalTemplate: {
           give: { Contribution: { pursePetname: 'Fun budget', value: 1 } },
           exit: { onDemand: null },
@@ -710,9 +714,9 @@ test('lib-wallet offer methods', async t => {
       },
       {
         id: 'unknown#1588645230204',
-        inviteHandleBoardId: '5007165',
-        instanceHandleBoardId: '3715714',
-        installationHandleBoardId: '14561541',
+        inviteHandleBoardId: '500716545',
+        instanceHandleBoardId: '371571443',
+        installationHandleBoardId: '1456154132',
         proposalTemplate: {
           give: { Contribution: { pursePetname: 'Fun budget', value: 1 } },
           exit: { onDemand: null },
@@ -770,7 +774,7 @@ test('lib-wallet addOffer for autoswap swap', async t => {
     simoleanBundle.mint.mintPayment(simoleanBundle.amountMath.make(1000)),
   );
 
-  /** @type {{ getLiquidityIssuer(): Issuer, makeSwapInvitation(): Invitation }} */
+  /** @type {{ getLiquidityIssuer: () => Issuer, makeSwapInvitation: () => Invitation }} */
   const publicAPI = await E(zoe).getPublicFacet(autoswapInstanceHandle);
   const liquidityIssuer = await E(publicAPI).getLiquidityIssuer();
 
@@ -780,8 +784,8 @@ test('lib-wallet addOffer for autoswap swap', async t => {
   // we have.
   const proposal = harden({
     give: {
-      TokenA: moolaBundle.amountMath.make(900),
-      TokenB: simoleanBundle.amountMath.make(500),
+      Central: moolaBundle.amountMath.make(900),
+      Secondary: simoleanBundle.amountMath.make(500),
     },
     want: {
       Liquidity: liquidityAmountMath.getEmpty(),
@@ -796,12 +800,14 @@ test('lib-wallet addOffer for autoswap swap', async t => {
   assert(moolaPurse);
   assert(simoleanPurse);
 
-  const moolaPayment = await E(moolaPurse).withdraw(proposal.give.TokenA);
-  const simoleanPayment = await E(simoleanPurse).withdraw(proposal.give.TokenB);
+  const moolaPayment = await E(moolaPurse).withdraw(proposal.give.Central);
+  const simoleanPayment = await E(simoleanPurse).withdraw(
+    proposal.give.Secondary,
+  );
 
   const payments = harden({
-    TokenA: moolaPayment,
-    TokenB: simoleanPayment,
+    Central: moolaPayment,
+    Secondary: simoleanPayment,
   });
   const liqSeat = await E(zoe).offer(addLiquidityInvite, proposal, payments);
   await E(liqSeat).getOfferResult();

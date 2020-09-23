@@ -1,6 +1,6 @@
 {
   "name": "@agoric/stat-logger",
-  "version": "0.3.0",
+  "version": "0.3.3-dev.2",
   "description": "Simple library for logging and graphing performance statistics",
   "main": "src/index.js",
   "repository": "https://github.com/Agoric/agoric-sdk",
@@ -18,8 +18,9 @@
     "vega-canvas": "^1.2.1"
   },
   "devDependencies": {
-    "ava": "^3.11.1",
-    "esm": "^3.2.25"
+    "ava": "^3.12.1",
+    "esm": "^3.2.25",
+    "nyc": "^15.1.0"
   },
   "publishConfig": {
     "access": "public"

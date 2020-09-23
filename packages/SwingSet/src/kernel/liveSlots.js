@@ -1,4 +1,4 @@
-/* global harden HandledPromise */
+/* global HandledPromise */
 
 import {
   QCLASS,
@@ -21,12 +21,13 @@ import { insistCapData } from '../capdata';
  * Instantiate the liveslots layer for a new vat and then populate the vat with
  * a new root object and its initial associated object graph, if any.
  *
- * @param syscall  Kernel syscall interface that the vat will have access to
- * @param state  Object to store and retrieve state; not used // TODO fix wart
- * @param buildRootObject  Function that will create a root object for the new vat
- * @param forVatID  Vat ID label, for use in debug diagostics
- *
- * @return an extended dispatcher object for the new vat
+ * @param {*} syscall  Kernel syscall interface that the vat will have access to
+ * @param {*} _state  Object to store and retrieve state; not used // TODO fix wart
+ * @param {*} buildRootObject  Function that will create a root object for the new vat
+ * @param {*} forVatID  Vat ID label, for use in debug diagostics
+ * @param {*} vatPowers
+ * @param {*} vatParameters
+ * @returns {*} an extended dispatcher object for the new vat
  */
 function build(
   syscall,
@@ -46,7 +47,7 @@ function build(
   const outstandingProxies = new WeakSet();
 
   /** Map in-vat object references -> vat slot strings.
-
+   
       Uses a weak map so that vat objects can (in princple) be GC'd.  Note that
       they currently can't actually be GC'd because the slotToVal table keeps
       them alive, but that will have to be addressed by a different
@@ -60,7 +61,7 @@ function build(
   let nextExportID = 1;
   let nextPromiseID = 5;
 
-  function makeImportedPresence(slot) {
+  function makeImportedPresence(slot, iface = `Alleged: presence ${slot}`) {
     // Called by convertSlotToVal for type=object (an `o-NN` reference). We
     // build a Presence for application-level code to receive. This Presence
     // is associated with 'slot' so that all handled messages get sent to
@@ -79,11 +80,11 @@ function build(
     let presence;
     const p = new HandledPromise((_res, _rej, resolveWithPresence) => {
       const remote = resolveWithPresence(fulfilledHandler);
-      presence = Remotable(`Presence ${slot}`, undefined, remote);
+      presence = Remotable(iface, undefined, remote);
       // remote === presence, actually
 
       // todo: mfig says to swap remote and presence (resolveWithPresence
-      // gives us a Presence, Remoteable gives us a Remote). I think that
+      // gives us a Presence, Remotable gives us a Remote). I think that
       // implies we have a lot of renaming to do, 'makeRemote' instead of
       // 'makeImportedPresence', etc. I'd like to defer that for a later
       // cleanup/renaming pass.
@@ -167,8 +168,8 @@ function build(
     return harden(p);
   }
 
-  function makeDeviceNode(id) {
-    return Remotable(`Device ${id}`);
+  function makeDeviceNode(id, iface = `Alleged: device ${id}`) {
+    return Remotable(iface);
   }
 
   // TODO: fix awkward non-orthogonality: allocateExportID() returns a number,
@@ -232,14 +233,14 @@ function build(
     return valToSlot.get(val);
   }
 
-  function convertSlotToVal(slot) {
+  function convertSlotToVal(slot, iface = undefined) {
     if (!slotToVal.has(slot)) {
       let val;
       const { type, allocatedByVat } = parseVatSlot(slot);
       assert(!allocatedByVat, details`I don't remember allocating ${slot}`);
       if (type === 'object') {
         // this is a new import value
-        val = makeImportedPresence(slot);
+        val = makeImportedPresence(slot, iface);
       } else if (type === 'promise') {
         assert(
           !parseVatSlot(slot).allocatedByVat,
@@ -252,7 +253,7 @@ function build(
         // some other then-able, we could just hook then() to notify us.
         syscall.subscribe(slot);
       } else if (type === 'device') {
-        val = makeDeviceNode(slot);
+        val = makeDeviceNode(slot, iface);
       } else {
         throw Error(`unrecognized slot type '${type}'`);
       }
@@ -373,23 +374,17 @@ function build(
     // Both situations are the business of this vat and the calling vat, not
     // the kernel. deliver() does not report such exceptions to the kernel.
 
-    try {
-      if (!(method in t)) {
-        const names = Object.getOwnPropertyNames(t);
-        throw new TypeError(`target[${method}] does not exist, has ${names}`);
-      }
-      if (!(t[method] instanceof Function)) {
-        const ftype = typeof t[method];
-        const names = Object.getOwnPropertyNames(t);
-        throw new TypeError(
-          `target[${method}] is not a function, typeof is ${ftype}, has ${names}`,
-        );
-      }
-      const res = t[method](...args);
-      Promise.resolve(res).then(notifySuccess, notifyFailure);
-    } catch (err) {
-      notifyFailure(err);
+    // We have a presence, so forward to it.
+    let res;
+    if (args) {
+      // It has arguments, must be a method application.
+      res = HandledPromise.applyMethod(t, method, args);
+    } else {
+      // Just a getter.
+      // TODO: untested, but in principle sound.
+      res = HandledPromise.get(t, method);
     }
+    res.then(notifySuccess, notifyFailure);
   }
 
   function retirePromiseID(promiseID) {
@@ -544,33 +539,34 @@ function build(
  * Instantiate the liveslots layer for a new vat and then populate the vat with
  * a new root object and its initial associated object graph, if any.
  *
- * @param syscall  Kernel syscall interface that the vat will have access to
- * @param state  Object to store and retrieve state
- * @param buildRootObject  Function that will create a root object for the new vat
- * @param forVatID  Vat ID label, for use in debug diagostics
- *
- * @return a dispatcher object for the new vat
+ * @param {*} syscall  Kernel syscall interface that the vat will have access to
+ * @param {*} state  Object to store and retrieve state
+ * @param {*} buildRootObject  Function that will create a root object for the new vat
+ * @param {*} forVatID  Vat ID label, for use in debug diagostics
+ * @param {*} vatPowers
+ * @param {*} vatParameters
+ * @returns {*} a dispatcher object for the new vat
  *
  * The caller provided buildRootObject function produces and returns the new vat's
  * root object:
  *
  *     buildRootObject(vatPowers, vatParameters)
  *
- *     Within the vat, `import { E } from '@agoric/eventual-send'` will
- *     provide the E wrapper. For any object x, E(x) returns a proxy object
- *     that converts any method invocation into a corresponding eventual send
- *     to x. That is, E(x).foo(arg1, arg2) is equivalent to x~.foo(arg1,
- *     arg2)
+ * Within the vat, `import { E } from '@agoric/eventual-send'` will
+ * provide the E wrapper. For any object x, E(x) returns a proxy object
+ * that converts any method invocation into a corresponding eventual send
+ * to x. That is, E(x).foo(arg1, arg2) is equivalent to x~.foo(arg1,
+ * arg2)
  *
- *     If x is the presence in this vat of a remote object (that is, an object
- *     outside the vat), this will result in a message send out of the vat via
- *     the kernel syscall interface.
+ * If x is the presence in this vat of a remote object (that is, an object
+ * outside the vat), this will result in a message send out of the vat via
+ * the kernel syscall interface.
  *
- *     In the same vein, if x is the presence in this vat of a kernel device,
- *     vatPowers.D(x) returns a proxy such that a method invocation on it is
- *     translated into the corresponding immediate invocation of the device
- *     (using, once again, the kernel syscall interface). D(x).foo(args) will
- *     perform an immediate syscall.callNow on the device node.
+ * In the same vein, if x is the presence in this vat of a kernel device,
+ * vatPowers.D(x) returns a proxy such that a method invocation on it is
+ * translated into the corresponding immediate invocation of the device
+ * (using, once again, the kernel syscall interface). D(x).foo(args) will
+ * perform an immediate syscall.callNow on the device node.
  */
 export function makeLiveSlots(
   syscall,
@@ -590,7 +586,7 @@ export function makeLiveSlots(
     state,
     buildRootObject,
     forVatID,
-    { ...vatPowers, getInterfaceOf, Remotable },
+    { ...vatPowers, getInterfaceOf, Remotable, makeMarshal },
     vatParameters,
   );
   return harden({

@@ -1,10 +1,8 @@
-/* global harden */
 import { insistMessage } from '../../message';
 
 export function makeDeliver(tools, dispatch) {
   const {
     meterRecord,
-    notifyTermination,
     refillAllMeters,
     stopGlobalMeter,
     transcriptManager,
@@ -17,8 +15,8 @@ export function makeDeliver(tools, dispatch) {
    * Run a function, returning a promise that waits for the promise queue to be
    * empty before resolving.
    *
-   * @param f  The function to run
-   * @param errmsg  Tag string to be associated with the error message that gets
+   * @param {*} f  The function to run
+   * @param {string} errmsg  Tag string to be associated with the error message that gets
    *     logged if `f` rejects.
    *
    * The kernel uses `runAndWait` to wait for the vat to become quiescent (that
@@ -31,9 +29,13 @@ export function makeDeliver(tools, dispatch) {
    * so, and the kernel must be defensive against this.
    */
   function runAndWait(f, errmsg) {
+    // prettier-ignore
     Promise.resolve()
       .then(f)
-      .then(undefined, err => console.log(`doProcess: ${errmsg}:`, err));
+      .then(
+        undefined,
+        err => console.log(`doProcess: ${errmsg}: ${err.message}`),
+      );
     return waitUntilQuiescent();
   }
 
@@ -48,17 +50,14 @@ export function makeDeliver(tools, dispatch) {
     await runAndWait(() => dispatch[dispatchOp](...dispatchArgs), errmsg);
     stopGlobalMeter();
 
+    let status = ['ok'];
     // refill this vat's meter, if any, accumulating its usage for stats
     if (meterRecord) {
       // note that refill() won't actually refill an exhausted meter
       const used = meterRecord.refill();
       const exhaustionError = meterRecord.isExhausted();
       if (exhaustionError) {
-        // TODO: if the vat requested death-before-confusion, unwind this
-        // crank and pretend all its syscalls never happened
-        if (notifyTermination) {
-          notifyTermination(exhaustionError);
-        }
+        status = ['error', exhaustionError.message];
       } else {
         updateStats(used);
       }
@@ -70,12 +69,13 @@ export function makeDeliver(tools, dispatch) {
     // TODO: if the dispatch failed, and we choose to destroy the vat, change
     // what we do with the transcript here.
     transcriptManager.finishDispatch();
+    return status;
   }
 
   async function deliverOneMessage(targetSlot, msg) {
     insistMessage(msg);
     const errmsg = `vat[${vatID}][${targetSlot}].${msg.method} dispatch failed`;
-    await doProcess(
+    return doProcess(
       ['deliver', targetSlot, msg.method, msg.args, msg.result],
       errmsg,
     );
@@ -87,6 +87,7 @@ export function makeDeliver(tools, dispatch) {
       case 'fulfilledToPresence':
         return doProcess(['notifyFulfillToPresence', vpid, vp.slot], errmsg);
       case 'redirected':
+        // TODO unimplemented
         throw new Error('not implemented yet');
       case 'fulfilledToData':
         return doProcess(['notifyFulfillToData', vpid, vp.data], errmsg);

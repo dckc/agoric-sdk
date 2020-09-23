@@ -1,5 +1,3 @@
-/* global harden */
-
 import { E } from '@agoric/eventual-send';
 
 export function buildRootObject(vatPowers) {
@@ -21,6 +19,13 @@ export function buildRootObject(vatPowers) {
           err => log(`terminated: ${err}`),
         );
       log(`created`);
+    },
+
+    getNever() {
+      // grab a Promise which won't resolve until the vat dies
+      const neverP = E(control.root).never();
+      neverP.catch(() => 'hush');
+      return [neverP];
     },
 
     async run() {

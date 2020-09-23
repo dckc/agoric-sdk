@@ -1,5 +1,3 @@
-/* global harden */
-
 import Nat from '@agoric/nat';
 import { assert, details } from '@agoric/assert';
 import { initializeVatState, makeVatKeeper } from './vatKeeper';
@@ -38,10 +36,11 @@ const enableKernelPromiseGC = true;
 // device.name.$NAME = $deviceID = d$NN
 // device.nextID = $NN
 
-// dynamic vats have these too:
+// kernelBundle = JSON(bundle)
+// bundle.$NAME = JSON(bundle)
+
 // v$NN.source = JSON({ bundle }) or JSON({ bundleName })
 // v$NN.options = JSON
-
 // v$NN.o.nextID = $NN
 // v$NN.p.nextID = $NN
 // v$NN.d.nextID = $NN
@@ -49,12 +48,13 @@ const enableKernelPromiseGC = true;
 // v$NN.c.$vatSlot = $kernelSlot = ko$NN/kp$NN/kd$NN
 // v$NN.t.$NN = JSON(transcript entry)
 // v$NN.t.nextID = $NN
-// v$NN.dead = missing | true
 
 // d$NN.o.nextID = $NN
 // d$NN.c.$kernelSlot = $deviceSlot = o-$NN/d+$NN/d-$NN
 // d$NN.c.$deviceSlot = $kernelSlot = ko$NN/kd$NN
 // d$NN.deviceState = JSON
+// d$NN.source = JSON({ bundle }) or JSON({ bundleName })
+// d$NN.options = JSON
 
 // runQueue = JSON(runQueue) // usually empty on disk
 
@@ -65,6 +65,7 @@ const enableKernelPromiseGC = true;
 // kp.nextID = $NN
 // kp$NN.state = unresolved | fulfilledToPresence | fulfilledToData | rejected
 // kp$NN.decider = missing | '' | $vatID
+// kp$NN.policy = missing (=ignore) | ignore | logAlways | logFailure | panic
 // kp$NN.subscribers = '' | $vatID[,$vatID..]
 // kp$NN.queue.$NN = JSON(msg)
 // kp$NN.queue.nextID = $NN
@@ -238,6 +239,14 @@ export default function makeKernelKeeper(storage) {
     storage.set('crankNumber', '0');
   }
 
+  function addBundle(name, bundle) {
+    storage.set(`bundle.${name}`, JSON.stringify(bundle));
+  }
+
+  function getBundle(name) {
+    return harden(JSON.parse(storage.get(`bundle.${name}`)));
+  }
+
   function addKernelObject(ownerID) {
     insistVatID(ownerID);
     const id = Nat(Number(getRequired('ko.nextID')));
@@ -251,8 +260,10 @@ export default function makeKernelKeeper(storage) {
 
   function ownerOfKernelObject(kernelSlot) {
     insistKernelType('object', kernelSlot);
-    const owner = getRequired(`${kernelSlot}.owner`);
-    insistVatID(owner);
+    const owner = storage.get(`${kernelSlot}.owner`);
+    if (owner) {
+      insistVatID(owner);
+    }
     return owner;
   }
 
@@ -274,7 +285,7 @@ export default function makeKernelKeeper(storage) {
     return owner;
   }
 
-  function addKernelPromise() {
+  function addKernelPromise(policy) {
     const kpidNum = Nat(Number(getRequired('kp.nextID')));
     storage.set('kp.nextID', `${kpidNum + 1}`);
     const kpid = makeKernelSlot('promise', kpidNum);
@@ -283,6 +294,9 @@ export default function makeKernelKeeper(storage) {
     storage.set(`${kpid}.queue.nextID`, `0`);
     storage.set(`${kpid}.refCount`, `0`);
     storage.set(`${kpid}.decider`, '');
+    if (policy && policy !== 'ignore') {
+      storage.set(`${kpid}.policy`, policy);
+    }
     // queue is empty, so no state[kp$NN.queue.$NN] keys yet
     incStat('kernelPromises');
     incStat('kpUnresolved');
@@ -309,6 +323,7 @@ export default function makeKernelKeeper(storage) {
         if (p.decider === '') {
           p.decider = undefined;
         }
+        p.policy = storage.get(`${kernelSlot}.policy`) || 'ignore';
         p.subscribers = commaSplit(storage.get(`${kernelSlot}.subscribers`));
         p.queue = Array.from(
           storage.getPrefixedValues(`${kernelSlot}.queue.`),
@@ -371,6 +386,7 @@ export default function makeKernelKeeper(storage) {
     storage.delete(`${kpid}.state`);
     storage.delete(`${kpid}.decider`);
     storage.delete(`${kpid}.subscribers`);
+    storage.delete(`${kpid}.policy`);
     storage.deletePrefixedKeys(`${kpid}.queue.`);
     storage.delete(`${kpid}.queue.nextID`);
     storage.delete(`${kpid}.slot`);
@@ -432,21 +448,78 @@ export default function makeKernelKeeper(storage) {
     storage.set(`${kernelSlot}.data.slots`, capdata.slots.join(','));
   }
 
-  function findPromisesDecidedByVat(vatID) {
-    const prefixKey = `${vatID}.c.p`;
-    const endKey = `${vatID}.c.q`;
-    const result = [];
-    for (const k of storage.getKeys(prefixKey, endKey)) {
-      // The store semantics ensure this iteration is lexicographic.  Any
-      // changes to the creation of the list of promises need to preserve this
-      // in order to preserve determinism.
-      const kpid = storage.get(k);
-      const p = getKernelPromise(kpid);
-      if (p.state === 'unresolved' && p.decider === vatID) {
-        result.push(kpid);
+  function cleanupAfterTerminatedVat(vatID) {
+    insistVatID(vatID);
+    ephemeral.vatKeepers.delete(vatID);
+    const koPrefix = `${vatID}.c.o+`;
+    const kpPrefix = `${vatID}.c.p`;
+    const kernelPromisesToReject = [];
+    for (const k of storage.getKeys(`${vatID}.`, `${vatID}/`)) {
+      // The current store semantics ensure this iteration is lexicographic.
+      // Any changes to the creation of the list of promises to be rejected (and
+      // thus to the order in which they *get* rejected) need to preserve this
+      // ordering in order to preserve determinism.  TODO: we would like to
+      // shift to a different deterministic ordering scheme that is less fragile
+      // in the face of potential changes in the nature of the database being
+      // used.
+      if (k.startsWith(koPrefix)) {
+        // The void for an object exported by a vat will always be of the form
+        // `o+NN`.  The '+' means that the vat exported the object (rather than
+        // importing it) and therefor the object is owned by (i.e., within) the
+        // vat.  The corresponding void->koid c-list entry will thus always
+        // begin with `vMM.c.o+`.  In addition to deleting the c-list entry, we
+        // must also delete the corresponding kernel owner entry for the object,
+        // since the object will no longer be accessible.
+        const koid = storage.get(k);
+        const ownerKey = `${koid}.owner`;
+        const ownerVat = storage.get(ownerKey);
+        if (ownerVat === vatID) {
+          storage.delete(ownerKey);
+        }
+      } else if (k.startsWith(kpPrefix)) {
+        // The vpid for a promise imported or exported by a vat (and thus
+        // potentially a promise for which the vat *might* be the decider) will
+        // always be of the form `p+NN` or `p-NN`.  The corresponding vpid->kpid
+        // c-list entry will thus always begin with `vMM.c.p`.  Decider-ship is
+        // independent of whether the promise was imported or exported, so we
+        // have to look up the corresponding kernel promise table entry to see
+        // whether the vat is the decider or not.  If it is, we add the promise
+        // to the list of promises that must be rejected because the dead vat
+        // will never be able to act upon them.
+        const kpid = storage.get(k);
+        const p = getKernelPromise(kpid);
+        if (p.state === 'unresolved' && p.decider === vatID) {
+          kernelPromisesToReject.push(kpid);
+        }
+      }
+      storage.delete(k);
+    }
+    // TODO: deleting entries from the dynamic vat IDs list requires a linear
+    // scan of the list; arguably this collection ought to be represented in a
+    // different way that makes it efficient to remove an entry from it, though
+    // for the time being the linear list should be OK enough as long as we keep
+    // the list short.
+    const DYNAMIC_IDS_KEY = 'vat.dynamicIDs';
+    const oldDynamicVatIDs = JSON.parse(getRequired(DYNAMIC_IDS_KEY));
+    const newDynamicVatIDs = oldDynamicVatIDs.filter(v => v !== vatID);
+    if (newDynamicVatIDs.length !== oldDynamicVatIDs.length) {
+      storage.set(DYNAMIC_IDS_KEY, JSON.stringify(newDynamicVatIDs));
+    } else {
+      console.log(`removing static vat ${vatID}`);
+      for (const k of storage.getKeys('vat.name.', 'vat.name/')) {
+        if (storage.get(k) === vatID) {
+          storage.delete(k);
+          const VAT_NAMES_KEY = 'vat.names';
+          const name = k.slice('vat.name.'.length);
+          const oldStaticVatNames = JSON.parse(getRequired(VAT_NAMES_KEY));
+          const newStaticVatNames = oldStaticVatNames.filter(v => v !== name);
+          storage.set(VAT_NAMES_KEY, JSON.stringify(newStaticVatNames));
+          break;
+        }
       }
     }
-    return result;
+
+    return kernelPromisesToReject;
   }
 
   function addMessageToPromiseQueue(kernelSlot, msg) {
@@ -516,6 +589,10 @@ export default function makeKernelKeeper(storage) {
     return msg;
   }
 
+  function hasVatWithName(name) {
+    return storage.has(`vat.name.${name}`);
+  }
+
   function getVatIDForName(name) {
     assert.typeof(name, 'string');
     const k = `vat.name.${name}`;
@@ -551,7 +628,27 @@ export default function makeKernelKeeper(storage) {
     storage.set(KEY, JSON.stringify(dynamicVatIDs));
   }
 
-  function getAllDynamicVatIDs() {
+  function getStaticVats() {
+    const result = [];
+    for (const k of storage.getKeys('vat.name.', 'vat.name/')) {
+      const name = k.slice(9);
+      const vatID = storage.get(k);
+      result.push([name, vatID]);
+    }
+    return result;
+  }
+
+  function getDevices() {
+    const result = [];
+    for (const k of storage.getKeys('device.name.', 'device.name/')) {
+      const name = k.slice(12);
+      const deviceID = storage.get(k);
+      result.push([name, deviceID]);
+    }
+    return result;
+  }
+
+  function getDynamicVats() {
     return JSON.parse(getRequired('vat.dynamicIDs'));
   }
 
@@ -563,12 +660,13 @@ export default function makeKernelKeeper(storage) {
    * Note that currently we are only reference counting promises, but ultimately
    * we intend to keep track of all objects with kernel slots.
    *
-   * @param kernelSlot  The kernel slot whose refcount is to be incremented.
+   * @param {*} kernelSlot  The kernel slot whose refcount is to be incremented.
+   * @param {*} _tag
    */
-  function incrementRefCount(kernelSlot, tag) {
+  function incrementRefCount(kernelSlot, _tag) {
     if (kernelSlot && parseKernelSlot(kernelSlot).type === 'promise') {
       const refCount = Nat(Number(storage.get(`${kernelSlot}.refCount`))) + 1;
-      kdebug(`++ ${kernelSlot}  ${tag} ${refCount}`);
+      // kdebug(`++ ${kernelSlot}  ${tag} ${refCount}`);
       storage.set(`${kernelSlot}.refCount`, `${refCount}`);
     }
   }
@@ -579,10 +677,9 @@ export default function makeKernelKeeper(storage) {
    * Note that currently we are only reference counting promises, but ultimately
    * we intend to keep track of all objects with kernel slots.
    *
-   * @param kernelSlot  The kernel slot whose refcount is to be decremented.
-   *
-   * @return true if the reference count has been decremented to zero, false if it is still non-zero
-   *
+   * @param {*} kernelSlot  The kernel slot whose refcount is to be decremented.
+   * @param {string} tag
+   * @returns {boolean} true if the reference count has been decremented to zero, false if it is still non-zero
    * @throws if this tries to decrement the reference count below zero.
    */
   function decrementRefCount(kernelSlot, tag) {
@@ -590,7 +687,7 @@ export default function makeKernelKeeper(storage) {
       let refCount = Nat(Number(storage.get(`${kernelSlot}.refCount`)));
       assert(refCount > 0, details`refCount underflow {kernelSlot} ${tag}`);
       refCount -= 1;
-      kdebug(`-- ${kernelSlot}  ${tag} ${refCount}`);
+      // kdebug(`-- ${kernelSlot}  ${tag} ${refCount}`);
       storage.set(`${kernelSlot}.refCount`, `${refCount}`);
       if (refCount === 0) {
         deadKernelPromises.add(kernelSlot);
@@ -622,30 +719,32 @@ export default function makeKernelKeeper(storage) {
     deadKernelPromises.clear();
   }
 
-  function allocateVatKeeperIfNeeded(vatID) {
+  function getVatKeeper(vatID) {
+    insistVatID(vatID);
+    return ephemeral.vatKeepers.get(vatID);
+  }
+
+  function allocateVatKeeper(vatID) {
     insistVatID(vatID);
     if (!storage.has(`${vatID}.o.nextID`)) {
       initializeVatState(storage, vatID);
     }
-    if (!ephemeral.vatKeepers.has(vatID)) {
-      const vk = makeVatKeeper(
-        storage,
-        vatID,
-        addKernelObject,
-        addKernelPromiseForVat,
-        incrementRefCount,
-        decrementRefCount,
-        incStat,
-        decStat,
-      );
-      ephemeral.vatKeepers.set(vatID, vk);
-    }
-    return ephemeral.vatKeepers.get(vatID);
-  }
-
-  function forgetVat(vatID) {
-    insistVatID(vatID);
-    ephemeral.vatKeepers.delete(vatID);
+    assert(
+      !ephemeral.vatKeepers.has(vatID),
+      details`vatID ${vatID} already defined`,
+    );
+    const vk = makeVatKeeper(
+      storage,
+      vatID,
+      addKernelObject,
+      addKernelPromiseForVat,
+      incrementRefCount,
+      decrementRefCount,
+      incStat,
+      decStat,
+    );
+    ephemeral.vatKeepers.set(vatID, vk);
+    return vk;
   }
 
   function getAllVatIDs() {
@@ -658,11 +757,6 @@ export default function makeKernelKeeper(storage) {
       }
     }
     return harden(vatIDs);
-  }
-
-  function getAllVatNames() {
-    const names = JSON.parse(getRequired('vat.names'));
-    return harden(names.sort());
   }
 
   function getDeviceIDForName(name) {
@@ -712,11 +806,6 @@ export default function makeKernelKeeper(storage) {
     return harden(deviceIDs);
   }
 
-  function getAllDeviceNames() {
-    const names = JSON.parse(getRequired('device.names'));
-    return harden(names.sort());
-  }
-
   // used for debugging, and tests. This returns a JSON-serializable object.
   // It includes references to live (mutable) kernel state, so don't mutate
   // the pieces, and be sure to serialize/deserialize before passing it
@@ -726,16 +815,17 @@ export default function makeKernelKeeper(storage) {
     const kernelTable = [];
 
     for (const vatID of getAllVatIDs()) {
-      const vk = allocateVatKeeperIfNeeded(vatID);
-
-      // TODO: find some way to expose the liveSlots internal tables, the
-      // kernel doesn't see them
-      const vatTable = {
-        vatID,
-        state: { transcript: Array.from(vk.getTranscript()) },
-      };
-      vatTables.push(vatTable);
-      vk.dumpState().forEach(e => kernelTable.push(e));
+      const vk = getVatKeeper(vatID);
+      if (vk) {
+        // TODO: find some way to expose the liveSlots internal tables, the
+        // kernel doesn't see them
+        const vatTable = {
+          vatID,
+          state: { transcript: Array.from(vk.getTranscript()) },
+        };
+        vatTables.push(vatTable);
+        vk.dumpState().forEach(e => kernelTable.push(e));
+      }
     }
 
     for (const deviceID of getAllDeviceIDs()) {
@@ -793,6 +883,8 @@ export default function makeKernelKeeper(storage) {
     getInitialized,
     setInitialized,
     createStartingKernelState,
+    addBundle,
+    getBundle,
 
     getCrankNumber,
     incrementCrankNumber,
@@ -815,7 +907,6 @@ export default function makeKernelKeeper(storage) {
     fulfillKernelPromiseToPresence,
     fulfillKernelPromiseToData,
     rejectKernelPromise,
-    findPromisesDecidedByVat,
     addMessageToPromiseQueue,
     addSubscriberToPromise,
     setDecider,
@@ -828,19 +919,21 @@ export default function makeKernelKeeper(storage) {
     getRunQueueLength,
     getNextMsg,
 
+    hasVatWithName,
     getVatIDForName,
     allocateVatIDForNameIfNeeded,
     allocateUnusedVatID,
-    allocateVatKeeperIfNeeded,
-    forgetVat,
-    getAllVatNames,
+    allocateVatKeeper,
+    getVatKeeper,
+    cleanupAfterTerminatedVat,
     addDynamicVatID,
-    getAllDynamicVatIDs,
+    getDynamicVats,
+    getStaticVats,
+    getDevices,
 
     getDeviceIDForName,
     allocateDeviceIDForNameIfNeeded,
     allocateDeviceKeeperIfNeeded,
-    getAllDeviceNames,
 
     dump,
   });

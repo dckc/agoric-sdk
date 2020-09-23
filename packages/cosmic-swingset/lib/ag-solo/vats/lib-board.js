@@ -1,14 +1,51 @@
-/* global harden */
+// @ts-check
 
 import { generateSparseInts } from '@agoric/sparse-ints';
-import { assert, details } from '@agoric/assert';
+import { assert, details, q } from '@agoric/assert';
 import makeStore from '@agoric/store';
+import { models as crcmodels } from 'polycrc';
 
+const CRC_NUM_DIGITS = 2;
+const ID_REGEXP = new RegExp(`^[0-9]{${CRC_NUM_DIGITS + 1},}$`);
+
+/**
+ * We calculate a CRC, ensuring it's of CRC_NUM_DIGITS length.
+ *
+ * @param {number} num
+ * @returns {string}
+ */
+const calcCrc = num => {
+  // The explicit use of crcmodels is to avoid a typing error.
+  // Add 1 to guarantee we don't get a 0.
+  const crc = crcmodels.crc6.calculate(num) + 1;
+  const crcStr = crc.toString().padStart(CRC_NUM_DIGITS, '0');
+  assert(
+    crcStr.length <= CRC_NUM_DIGITS,
+    `CRC too big for its britches ${crcStr}`,
+  );
+  return crcStr;
+};
+
+/**
+ * @typedef {Object} Board
+ * @property {(id: string) => any} getValue
+ * @property {(value: any) => string} getId
+ * @property {(value: any) => boolean} has
+ * @property {() => string[]} ids
+ */
+
+/**
+ * Create a board to post things on.
+ *
+ * @param {number} [seed=0]
+ * @returns {Board}
+ */
 function makeBoard(seed = 0) {
   const idToVal = makeStore('boardId');
   const valToId = makeStore('value');
   const sparseInts = generateSparseInts(seed);
 
+  /** @type {Board} */
   const board = harden({
     // Add if not already present
     getId: value => {
@@ -16,7 +53,8 @@ function makeBoard(seed = 0) {
         // Retry until we have a unique id.
         let id;
         do {
-          id = sparseInts.next().value.toString();
+          const num = sparseInts.next().value;
+          id = `${num}${calcCrc(num)}`;
         } while (idToVal.has(id));
 
         valToId.init(value, id);
@@ -26,6 +64,18 @@ function makeBoard(seed = 0) {
     },
     getValue: id => {
       assert.equal(typeof id, 'string', details`id must be string ${id}`);
+      assert(
+        id.match(ID_REGEXP),
+        details`id must consist of at least ${q(CRC_NUM_DIGITS + 1)} digits`,
+      );
+      const num = Number(id.slice(0, -CRC_NUM_DIGITS));
+      const allegedCrc = id.slice(-CRC_NUM_DIGITS);
+      const crc = calcCrc(num);
+      assert.equal(
+        allegedCrc,
+        crc,
+        details`id is probably a typo, cannot verify CRC: ${id}`,
+      );
       assert(idToVal.has(id), details`board does not have id: ${id}`);
       return idToVal.get(id);
     },
@@ -37,5 +87,3 @@ function makeBoard(seed = 0) {
 }
 
 export { makeBoard };
-
-/** @typedef {ReturnType<typeof makeBoard>} Board */

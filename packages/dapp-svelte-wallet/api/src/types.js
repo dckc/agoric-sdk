@@ -36,7 +36,7 @@
  * @typedef {Object} PurseActions
  * @property {(receiverP: ERef<{ receive: (payment: Payment) => void }>, valueToSend: Value) => Promise<void>} send
  * @property {(payment: Payment) => Promise<Value>} receive
- * @property {(payment: Payment, amount?: Amount) => Promise<Value>} deposit
+ * @property {(payment: Payment, amount: Amount=) => Promise<Value>} deposit
  */
 
 /**
@@ -57,9 +57,12 @@
  * @property {Promise<void>=} approvalP
  * @property {Petname} suggestedPetname
  * @property {Petname} petname
+ * @property {boolean} enable
  * @property {string} origin
  * @property {DappActions} actions
- *
+ */
+
+/**
  * @typedef {Object} DappActions
  * @property {(petname: Petname) => DappActions} setPetname
  * @property {() => DappActions} enable
@@ -91,9 +94,10 @@
  * @property {PaymentActions} actions
  * @property {Amount=} lastAmount
  * @property {Amount=} depositedAmount
+ * @property {string=} issuerBoardId
  *
  * @typedef {Object} PaymentActions
- * @property {(purseOrPetname?: Purse | Petname) => Promise<Value>} deposit
+ * @property {(purseOrPetname: (Purse | Petname)=) => Promise<Value>} deposit
  * @property {() => Promise<boolean>} refresh
  * @property {() => Promise<boolean>} getAmountOf
  */

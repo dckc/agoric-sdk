@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	// "github.com/Agoric/agoric-sdk/packages/cosmic-swingset/x/swingset/internal/types"
+	// "github.com/Agoric/cosmic-swingset/x/swingset/internal/types"
 
-	"github.com/Agoric/agoric-sdk/packages/cosmic-swingset/x/swingset/internal/types"
+	"github.com/Agoric/cosmic-swingset/x/swingset/internal/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
@@ -31,6 +31,9 @@ func NewHandler(keeper Keeper) sdk.Handler {
 		if committedHeight == ctx.BlockHeight() {
 			// We don't support simulation.
 			return &sdk.Result{}, nil
+		} else {
+			// The simulation was done, so now allow infinite gas.
+			ctx = ctx.WithGasMeter(sdk.NewInfiniteGasMeter())
 		}
 
 		switch msg := msg.(type) {

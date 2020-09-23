@@ -3,8 +3,11 @@ import { E, makeCapTP } from '@agoric/captp';
 import { makePromiseKit } from '@agoric/promise-kit';
 import bundleSource from '@agoric/bundle-source';
 import path from 'path';
+import inquirer from 'inquirer';
 
-// note: CapTP has it's own HandledPromise instantiation, and the contract
+import { getAccessToken } from './open';
+
+// note: CapTP has its own HandledPromise instantiation, and the contract
 // must use the same one that CapTP uses. We achieve this by not bundling
 // captp, and doing a (non-isolated) dynamic import of the deploy script
 // below, so everything uses the same module table. The eventual-send that
@@ -18,20 +21,41 @@ import path from 'path';
 
 const RETRY_DELAY_MS = 1000;
 
+const PATH_SEP_RE = new RegExp(`${path.sep}`, 'g');
+
 export default async function deployMain(progname, rawArgs, powers, opts) {
-  const { anylogger, makeWebSocket } = powers;
+  const { anylogger, fs, makeWebSocket } = powers;
   const console = anylogger('agoric:deploy');
+
+  const allowUnsafePlugins = opts.allowUnsafePlugins;
+  if (allowUnsafePlugins) {
+    const { yesReally } = await inquirer.prompt([
+      {
+        name: 'yesReally',
+        message: `Enable unsafe (unconfined) plugins for this deployment?  Type 'yes' if you are sure:`,
+        default: 'no',
+      },
+    ]);
+    if (yesReally !== 'yes') {
+      console.error(
+        `Aborting (if you wish to continue unsafely, you must type 'yes' exactly)!`,
+      );
+      process.exit(1);
+    }
+  }
 
   const args = rawArgs.slice(1);
   const provide = opts.provide
     .split(',')
     .map(dep => dep.trim())
-    .filter(dep => dep);
+    .filter(dep => dep)
+    .sort();
 
   const need = opts.need
     .split(',')
     .map(dep => dep.trim())
-    .filter(dep => dep && !provide.includes(dep));
+    .filter(dep => dep && !provide.includes(dep))
+    .sort();
 
   if (args.length === 0 && !provide.length) {
     console.error('you must specify at least one deploy.js (or --provide=XXX)');
@@ -56,8 +80,14 @@ export default async function deployMain(progname, rawArgs, powers, opts) {
     () => process.stdout.write(progressDot),
     1000,
   );
-  const retryWebsocket = () => {
-    const ws = makeWebSocket(wsurl, { origin: 'http://127.0.0.1' });
+
+  const retryWebsocket = async () => {
+    const accessToken = await getAccessToken(opts.hostport);
+
+    // For a WebSocket we need to put the token in the query string.
+    const wsWebkey = `${wsurl}?accessToken=${encodeURIComponent(accessToken)}`;
+
+    const ws = makeWebSocket(wsWebkey, { origin: 'http://127.0.0.1' });
     ws.on('open', async () => {
       connected = true;
       try {
@@ -92,6 +122,22 @@ export default async function deployMain(progname, rawArgs, powers, opts) {
             lastUpdateCount,
           );
           lastUpdateCount = update.updateCount;
+
+          // Skip the deploy if our provides are not needed.
+          let needsProvide = !provide.length;
+          const notNeeded = [];
+          for (const dep of provide) {
+            if (update.value.includes(dep)) {
+              needsProvide = true;
+            } else {
+              notNeeded.push(dep);
+            }
+          }
+          if (!needsProvide) {
+            console.info(`Don't need our provides: ${notNeeded.join(', ')}`);
+            return;
+          }
+
           const nextLoading = [];
           for (const dep of stillLoading) {
             if (update.value.includes(dep)) {
@@ -108,11 +154,63 @@ export default async function deployMain(progname, rawArgs, powers, opts) {
         // Take a new copy, since the chain objects have been added to bootstrap.
         bootP = getBootstrap();
 
+        const pluginManager = await E.G(E.G(bootP).local).plugin.catch(_ => {});
+        const pluginDir = await E(pluginManager)
+          .getPluginDir()
+          .catch(_ => {});
+
+        if (allowUnsafePlugins && !pluginDir) {
+          throw Error(
+            `Installing unsafe plugins disabled; no pluginDir detected`,
+          );
+        }
+
         for (const arg of args) {
           const moduleFile = path.resolve(process.cwd(), arg);
           const pathResolve = (...resArgs) =>
             path.resolve(path.dirname(moduleFile), ...resArgs);
           console.warn('running', moduleFile);
+
+          let installUnsafePlugin;
+          if (!allowUnsafePlugins) {
+            installUnsafePlugin = async (plugin, _opts = undefined) => {
+              throw Error(
+                `Installing unsafe plugin ${JSON.stringify(
+                  pathResolve(plugin),
+                )} disabled; maybe you meant '--allow-unsafe-plugins'?`,
+              );
+            };
+          } else {
+            installUnsafePlugin = async (plugin, pluginOpts = undefined) => {
+              try {
+                const absPath = pathResolve(plugin);
+                const pluginName = absPath.replace(PATH_SEP_RE, '_');
+                const pluginFile = path.resolve(pluginDir, pluginName);
+
+                // Just create a little redirector for that path.
+                console.warn(
+                  `Installing unsafe plugin ${JSON.stringify(absPath)}`,
+                );
+                const content = `\
+// ${pluginFile}
+// AUTOMATICALLY GENERATED BY ${JSON.stringify(
+                  [progname, ...rawArgs].join(' '),
+                )}
+export { bootPlugin } from ${JSON.stringify(absPath)};
+`;
+                await fs.writeFile(pluginFile, content);
+
+                // Return the bootstrap object for this plugin.
+                console.info(`Loading plugin ${JSON.stringify(pluginFile)}`);
+                return E.G(E(pluginManager).load(pluginName, pluginOpts))
+                  .bootstrap;
+              } catch (e) {
+                throw Error(
+                  `Cannot install unsafe plugin: ${(e && e.stack) || e}`,
+                );
+              }
+            };
+          }
 
           // use a dynamic import to load the deploy script, it is unconfined
           // eslint-disable-next-line import/no-dynamic-require,global-require
@@ -126,6 +224,7 @@ export default async function deployMain(progname, rawArgs, powers, opts) {
             await main(bootP, {
               bundleSource: file => bundleSource(pathResolve(file)),
               pathResolve,
+              installUnsafePlugin,
             });
           }
         }

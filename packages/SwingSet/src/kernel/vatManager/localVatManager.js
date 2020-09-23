@@ -1,4 +1,3 @@
-/* global harden */
 import { assert } from '@agoric/assert';
 import { importBundle } from '@agoric/import-bundle';
 import { makeLiveSlots } from '../liveSlots';
@@ -20,6 +19,7 @@ export function makeLocalVatManagerFactory(tools) {
   const baseVP = {
     Remotable: allVatPowers.Remotable,
     getInterfaceOf: allVatPowers.getInterfaceOf,
+    makeMarshal: allVatPowers.makeMarshal,
     transformTildot: allVatPowers.transformTildot,
   };
   const internalMeteringVP = {
@@ -28,9 +28,8 @@ export function makeLocalVatManagerFactory(tools) {
   };
   // testLog is also a vatPower, only for unit tests
 
-  function prepare(vatID, managerOptions = {}) {
-    const { notifyTermination = undefined } = managerOptions;
-    const vatKeeper = kernelKeeper.allocateVatKeeperIfNeeded(vatID);
+  function prepare(vatID) {
+    const vatKeeper = kernelKeeper.getVatKeeper(vatID);
     const transcriptManager = makeTranscriptManager(
       kernelKeeper,
       vatKeeper,
@@ -46,7 +45,6 @@ export function makeLocalVatManagerFactory(tools) {
         {
           vatID,
           stopGlobalMeter,
-          notifyTermination,
           meterRecord,
           refillAllMeters,
           transcriptManager,
@@ -65,7 +63,6 @@ export function makeLocalVatManagerFactory(tools) {
         setVatSyscallHandler,
         deliver,
         shutdown,
-        notifyTermination,
       });
       return manager;
     }
@@ -75,7 +72,6 @@ export function makeLocalVatManagerFactory(tools) {
   function createFromSetup(vatID, setup, managerOptions) {
     assert(!managerOptions.metered, `unsupported`);
     assert(!managerOptions.enableInternalMetering, `unsupported`);
-    assert(!managerOptions.notifyTermination, `unsupported`);
     assert(setup instanceof Function, 'setup is not an in-realm function');
     const { syscall, finish } = prepare(vatID, managerOptions);
 
@@ -149,13 +145,17 @@ export function makeLocalVatManagerFactory(tools) {
         vatPowers,
         vatParameters,
       );
-    } else {
+    } else if (enableSetup) {
       const setup = vatNS.default;
       assert(setup, `vat source bundle lacks (default) setup() function`);
-      assert(setup instanceof Function, `setup is not a function`);
-      assert(enableSetup, `got setup(), but not options.enableSetup`);
+      assert(
+        setup instanceof Function,
+        `vat source bundle default export is not a function`,
+      );
       const helpers = harden({}); // DEPRECATED, todo remove from setup()
       dispatch = setup(syscall, state, helpers, vatPowers);
+    } else {
+      throw Error(`vat source bundle lacks buildRootObject() function`);
     }
 
     const manager = finish(dispatch, meterRecord);

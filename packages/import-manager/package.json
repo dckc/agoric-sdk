@@ -1,6 +1,6 @@
 {
   "name": "@agoric/import-manager",
-  "version": "0.0.7",
+  "version": "0.1.2-dev.2",
   "description": "Share code across vat boundaries",
   "main": "src/importManager.js",
   "engines": {
@@ -27,19 +27,23 @@
     "url": "https://github.com/Agoric/agoric-sdk/issues"
   },
   "homepage": "https://github.com/Agoric/agoric-sdk#readme",
-  "dependencies": {},
   "devDependencies": {
-    "@agoric/install-ses": "^0.2.0",
-    "ava": "^3.11.1",
-    "esm": "^3.2.25"
+    "@agoric/install-ses": "^0.3.2-dev.2",
+    "ava": "^3.12.1",
+    "esm": "^3.2.25",
+    "nyc": "^15.1.0"
   },
   "files": [
     "src/",
     "NEWS.md"
   ],
   "ava": {
-    "files": ["test/**/test-*.js"],
-    "require": ["esm"]
+    "files": [
+      "test/**/test-*.js"
+    ],
+    "require": [
+      "esm"
+    ]
   },
   "eslintConfig": {
     "extends": [

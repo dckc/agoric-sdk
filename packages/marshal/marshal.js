@@ -1,14 +1,14 @@
-/* global harden */
 // @ts-check
 
 // eslint-disable-next-line spaced-comment
 /// <reference types="ses"/>
 
 import Nat from '@agoric/nat';
+import { assert, details } from '@agoric/assert';
 import { isPromise } from '@agoric/promise-kit';
 
 // TODO: Use just 'remote' when we're willing to make a breaking change.
-const REMOTE_STYLE = 'presence';
+export const REMOTE_STYLE = 'presence';
 
 // TODO, remove the mustPassByPresence alias when we make a breaking change.
 // eslint-disable-next-line no-use-before-define
@@ -18,6 +18,7 @@ export { mustPassByRemote as mustPassByPresence };
  * This is an interface specification.
  * For now, it is just a string, but will eventually become something
  * much richer (anything that pureCopy accepts).
+ *
  * @typedef {string} InterfaceSpec
  */
 
@@ -44,6 +45,7 @@ export function getInterfaceOf(maybeRemotable) {
  *
  * @template T
  * @param {T} val input value.  NOTE: Must be hardened!
+ * @param {WeakMap<any,any>} [already=new WeakMap()]
  * @returns {T} pure, hardened copy
  */
 function pureCopy(val, already = new WeakMap()) {
@@ -100,7 +102,7 @@ function pureCopy(val, already = new WeakMap()) {
 
     case REMOTE_STYLE: {
       throw TypeError(
-        `Input value ${passStyle} cannot be copied as must be passed by reference`,
+        `Input value ${passStyle} cannot be copied as it must be passed by reference`,
       );
     }
 
@@ -242,8 +244,9 @@ function isPassByCopyRecord(val) {
 }
 
 /**
- * Ensure that val could become a legitimate remotable.  This is used internally both
- * in the construction of a new remotable and mustPassByRemote.
+ * Ensure that val could become a legitimate remotable.  This is used
+ * internally both in the construction of a new remotable and
+ * mustPassByRemote.
  *
  * @param {*} val The remotable candidate to check
  */
@@ -441,12 +444,13 @@ function makeReviverIbidTable(cyclePolicy) {
 }
 
 const identityFn = x => x;
+const defaultSlotToValFn = (x, _) => x;
 
 export function makeMarshal(
   convertValToSlot = identityFn,
-  convertSlotToVal = identityFn,
+  convertSlotToVal = defaultSlotToValFn,
 ) {
-  function serializeSlot(val, slots, slotMap) {
+  function serializeSlot(val, slots, slotMap, iface = undefined) {
     let slotIndex;
     if (slotMap.has(val)) {
       slotIndex = slotMap.get(val);
@@ -458,6 +462,13 @@ export function makeMarshal(
       slotMap.set(val, slotIndex);
     }
 
+    if (iface !== undefined) {
+      return harden({
+        [QCLASS]: 'slot',
+        iface,
+        index: slotIndex,
+      });
+    }
     return harden({
       [QCLASS]: 'slot',
       index: slotIndex,
@@ -536,7 +547,11 @@ export function makeMarshal(
                 message: `${val.message}`,
               });
             }
-            case REMOTE_STYLE:
+            case REMOTE_STYLE: {
+              const iface = getInterfaceOf(val);
+              // console.log(`serializeSlot: ${val}`);
+              return serializeSlot(val, slots, slotMap, iface);
+            }
             case 'promise': {
               // console.log(`serializeSlot: ${val}`);
               return serializeSlot(val, slots, slotMap);
@@ -567,7 +582,7 @@ export function makeMarshal(
     // ibid table is shared across recursive calls to fullRevive.
     const ibidTable = makeReviverIbidTable(cyclePolicy);
 
-    // We stay close to the algorith at
+    // We stay close to the algorithm at
     // https://tc39.github.io/ecma262/#sec-json.parse , where
     // fullRevive(JSON.parse(str)) is like JSON.parse(str, revive))
     // for a similar reviver. But with the following differences:
@@ -655,7 +670,7 @@ export function makeMarshal(
 
           case 'slot': {
             const slot = slots[Nat(rawTree.index)];
-            return ibidTable.register(convertSlotToVal(slot));
+            return ibidTable.register(convertSlotToVal(slot, rawTree.iface));
           }
 
           default: {
@@ -707,19 +722,27 @@ export function makeMarshal(
  *
  * // https://github.com/Agoric/agoric-sdk/issues/804
  *
- * @param {InterfaceSpec} [iface='Remotable'] The interface specification for the remotable
+ * @param {InterfaceSpec} [iface='Remotable'] The interface specification for
+ * the remotable. For now, a string iface must be "Remotable" or begin with
+ * "Alleged: ", to serve as the alleged name. More general ifaces are not yet
+ * implemented. This is temporary.
  * @param {object} [props={}] Own-properties are copied to the remotable
  * @param {object} [remotable={}] The object used as the remotable
  * @returns {object} remotable, modified for debuggability
  */
 function Remotable(iface = 'Remotable', props = {}, remotable = {}) {
+  // TODO unimplemented
+  assert.typeof(
+    iface,
+    'string',
+    details`Interface ${iface} must be a string; unimplemented`,
+  );
+  // TODO unimplemented
+  assert(
+    iface === 'Remotable' || iface.startsWith('Alleged: '),
+    details`For now, iface ${iface} must be "Remotable" or begin with "Alleged: "; unimplemented`,
+  );
   iface = pureCopy(harden(iface));
-  const ifaceType = typeof iface;
-
-  // Find the alleged name.
-  if (ifaceType !== 'string') {
-    throw Error(`Interface must be a string, not ${ifaceType}; unimplemented`);
-  }
 
   // TODO: When iface is richer than just string, we need to get the allegedName
   // in a different way.

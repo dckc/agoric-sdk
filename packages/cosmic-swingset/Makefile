@@ -9,13 +9,8 @@ FAKE_CHAIN_DELAY = 0
 NUM_SOLOS?=1
 BASE_PORT?=8000
 
-ifneq ("$(wildcard /vagrant)","")
-# Within a VM.  We need to get to the outside.
-INSPECT_ADDRESS = 0.0.0.0
-else
 # On a host machine.  Stay here.
 INSPECT_ADDRESS = 127.0.0.1
-endif
 
 BREAK_CHAIN = false
 NODE_DEBUG = node --inspect-port=$(INSPECT_ADDRESS):9229
@@ -99,14 +94,14 @@ t1-provision-one-with-powers:
 	addr=$$(cat t1/$(BASE_PORT)/ag-cosmos-helper-address); \
 	  $(AGCH) --home=t1/bootstrap query swingset egress $$addr --chain-id=$(CHAIN_ID) || \
 	  $(AGCH) --home=t1/bootstrap tx swingset provision-one --keyring-backend=test --from=bootstrap \
-		  --gas=auto --gas-adjustment=1.4 --broadcast-mode=block --yes --chain-id=$(CHAIN_ID) \
+		  --gas=auto --broadcast-mode=block --yes --chain-id=$(CHAIN_ID) \
 		  t1/$(BASE_PORT) $$addr agoric.vattp | tee /dev/stderr | grep -q 'code: 0'
 
 t1-provision-one:
 	addr=$$(cat t1/$(BASE_PORT)/ag-cosmos-helper-address); \
 	  $(AGCH) --home=t1/bootstrap query swingset egress $$addr --chain-id=$(CHAIN_ID) || \
 	  $(AGCH) --home=t1/bootstrap tx swingset provision-one --keyring-backend=test --from=bootstrap \
-		  --gas=auto --gas-adjustment=1.4 --broadcast-mode=block --yes --chain-id=$(CHAIN_ID) \
+		  --gas=auto --broadcast-mode=block --yes --chain-id=$(CHAIN_ID) \
 		  t1/$(BASE_PORT) $$addr | tee /dev/stderr | grep -q 'code: 0'
 
 # Actually start the ag-solo.
@@ -135,7 +130,7 @@ scenario3-run:
 	cd t3 && ../bin/ag-solo start
 
 docker-pull:
-	for f in '' -pserver -setup -setup-solo -solo; do \
+	for f in '' -setup -solo; do \
 		docker pull $(REPOSITORY)$$f:latest || exit $$?; \
 	done
 
@@ -190,21 +185,6 @@ set-local-gci-ingress:
 		(cd $$dir && \
 			../../bin/ag-solo set-gci-ingress --chainID=$(CHAIN_ID) $$gci $$rpcport); \
 	done
-
-install-pserver:
-	python3 -mvenv ve3
-	ve3/bin/pip install -U setuptools wheel
-	ve3/bin/pip install --editable ./provisioning-server
-
-run-pserver:
-	ve3/bin/ag-pserver --listen tcp:8001 --controller tcp:localhost:8002
-
-install-setup-client:
-	python3 -mvenv ve3-client
-	ve3-client/bin/pip install -U setuptools wheel
-	ve3-client/bin/pip install --editable ./setup-solo
-run-setup-client:
-	ve3-client/bin/ag-setup-solo
 
 ###############################################################################
 ###                                Protobuf                                 ###

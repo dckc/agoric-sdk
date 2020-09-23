@@ -3,6 +3,151 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.21.1-dev.2](https://github.com/Agoric/agoric-sdk/compare/@agoric/cosmic-swingset@0.21.1-dev.1...@agoric/cosmic-swingset@0.21.1-dev.2) (2020-09-18)
+
+
+### Bug Fixes
+
+* **cosmic-swingset:** remove monorepo Go dependency ([052518e](https://github.com/Agoric/agoric-sdk/commit/052518eef787f28bcf29c025bb1e25dd9c411fee))
+
+
+
+
+
+## [0.21.1-dev.1](https://github.com/Agoric/agoric-sdk/compare/@agoric/cosmic-swingset@0.21.1-dev.0...@agoric/cosmic-swingset@0.21.1-dev.1) (2020-09-18)
+
+**Note:** Version bump only for package @agoric/cosmic-swingset
+
+
+
+
+
+## [0.21.1-dev.0](https://github.com/Agoric/agoric-sdk/compare/@agoric/cosmic-swingset@0.21.0...@agoric/cosmic-swingset@0.21.1-dev.0) (2020-09-18)
+
+**Note:** Version bump only for package @agoric/cosmic-swingset
+
+
+
+
+
+# [0.21.0](https://github.com/Agoric/agoric-sdk/compare/@agoric/cosmic-swingset@0.20.1...@agoric/cosmic-swingset@0.21.0) (2020-09-16)
+
+
+### Bug Fixes
+
+* add TODO unimplemented for liveSlots synthetic presences ([6089e71](https://github.com/Agoric/agoric-sdk/commit/6089e71aaa48867625c19d2f64c6e5b29880b7ad))
+* change webkey -> accessToken and polish usage ([0362abe](https://github.com/Agoric/agoric-sdk/commit/0362abe1f6aa1322d50826e77c052881d940f72e))
+* drastically simplify the new-block listener ([2b3160f](https://github.com/Agoric/agoric-sdk/commit/2b3160fb9efe35e63749ef6cc8d616c37beb01b3))
+* excise half-fast Vagrant support ([9bbab1c](https://github.com/Agoric/agoric-sdk/commit/9bbab1c204a0c44bad2e51bcd0f7d08ad02b5a5b))
+* have accessToken use a database in ~/.agoric, not network ([bc9cf83](https://github.com/Agoric/agoric-sdk/commit/bc9cf83273b01b76006d69e4ea47b9efbee358dd))
+* implement epochs and make tolerant of restarts ([1c786b8](https://github.com/Agoric/agoric-sdk/commit/1c786b861a445891d09df2f1a47d689d641a0c5f))
+* implement robust plugin persistence model ([2de552e](https://github.com/Agoric/agoric-sdk/commit/2de552ed4a4b25e5fcc641ff5e80afd5af1d167d))
+* make generateAccessToken URL-safe by default ([722f811](https://github.com/Agoric/agoric-sdk/commit/722f811001a16d62e69af76de8a889e6eac4a48f))
+* need to expose the wallet bridge to the dapp ([e520b8f](https://github.com/Agoric/agoric-sdk/commit/e520b8fc2afa6f24447140fa54581f4c25cf08cb))
+* pass through the entire marshal stack to the vat ([f93c26b](https://github.com/Agoric/agoric-sdk/commit/f93c26b602766c9d8e3eb15740236cf81b38387f))
+* properly detect incorrect transactions ([9f8866b](https://github.com/Agoric/agoric-sdk/commit/9f8866b34f2c2ff214f006953371a447860938dd))
+* remove ability for localhost to auto-popup the wallet ([597cb80](https://github.com/Agoric/agoric-sdk/commit/597cb8071f335a3aa5a0bcc17d7ff88c1ccc4e07))
+* restoring most state, just need to isolate the plugin captp ([f92ee73](https://github.com/Agoric/agoric-sdk/commit/f92ee731afa69435b10b94cf4a483f25bed7a668))
+* restrict plugins to be loaded only from ./plugins ([2ba608e](https://github.com/Agoric/agoric-sdk/commit/2ba608e46c6d8d33bdfca03a32af09f9cde3cc34))
+* robust .innerHTML protection as per OWASP ([0e54b30](https://github.com/Agoric/agoric-sdk/commit/0e54b30f44bedf55c809fafb17a0cbf05c598636))
+* SECURITY: ensure that HTML tags in the REPL are defanged ([b9bd5eb](https://github.com/Agoric/agoric-sdk/commit/b9bd5ebc1a8071326fc206062e089212236430fc))
+* SECURITY: use a private on-disk webkey for trusted auth ([f769d95](https://github.com/Agoric/agoric-sdk/commit/f769d95031f8e0b2003d31f0554dce17d6440f1b))
+* unique() was LGPL; remove it in favour of a freer alternative ([b2a5319](https://github.com/Agoric/agoric-sdk/commit/b2a53199f238d7f9049bfb31dbb4f9b2f1d433fe))
+* upgrade to polycrc that supports safe integers ([b7674c6](https://github.com/Agoric/agoric-sdk/commit/b7674c64a4bdd321bb6fa96f9485161fc3315309))
+
+
+### Features
+
+* add a simple CRC-6 to board ids to prevent dangerous typos ([85ea976](https://github.com/Agoric/agoric-sdk/commit/85ea9760d652727ef6780efa7529e7f6f7f20b76))
+* add local.plugin~.getPluginDir() ([94e7016](https://github.com/Agoric/agoric-sdk/commit/94e70164c1be5f68aaadfcf75223c441cde9f876))
+* agoric deploy --allow-unsafe-plugins ([d2a545e](https://github.com/Agoric/agoric-sdk/commit/d2a545ed73b4403f9d85d5ff89637e2470ecdb29))
+* be resilient to losing a connection to the chain ([db4274f](https://github.com/Agoric/agoric-sdk/commit/db4274fc8d2670d9191d4373e97bae3380ddc327))
+* implement CapTP forwarding over a plugin device ([b4a1be8](https://github.com/Agoric/agoric-sdk/commit/b4a1be8f600d60191570a3bbf42bc4c82af47b06))
+* provide a button to activate the wallet from the bridge ([18f1cb2](https://github.com/Agoric/agoric-sdk/commit/18f1cb2793f9a3db25fcab09882fb6421e2e364b))
+
+
+
+
+
+## [0.20.1](https://github.com/Agoric/agoric-sdk/compare/@agoric/cosmic-swingset@0.20.0...@agoric/cosmic-swingset@0.20.1) (2020-08-31)
+
+**Note:** Version bump only for package @agoric/cosmic-swingset
+
+
+
+
+
+# [0.20.0](https://github.com/Agoric/agoric-sdk/compare/@agoric/cosmic-swingset@0.19.0...@agoric/cosmic-swingset@0.20.0) (2020-08-31)
+
+
+### Bug Fixes
+
+* add "TODO unimplemented"s ([#1580](https://github.com/Agoric/agoric-sdk/issues/1580)) ([7795f93](https://github.com/Agoric/agoric-sdk/commit/7795f9302843a2c94d4a2f42cb22affe1e91d41d))
+* **ag-nchainz:** provision solos with agoric.vattp capability ([e9fc9ed](https://github.com/Agoric/agoric-sdk/commit/e9fc9edad2bd4747ca1f7afd42231663cf20fe21))
+* actually test cosmic-swingset files in parallel ([e936999](https://github.com/Agoric/agoric-sdk/commit/e93699913772084247cc3ce475ffd47f810a96e1))
+* add `local.comms` object as well ([cf5566f](https://github.com/Agoric/agoric-sdk/commit/cf5566f2e6f7848c3ca1d4034394dcc83074d02b))
+* add a version check assertion to enforce Golang 1.14+ ([433d1ce](https://github.com/Agoric/agoric-sdk/commit/433d1ce78d92d5d89beb460075a85acaa6455fa5))
+* add local.vattp to localBundle ([a26165a](https://github.com/Agoric/agoric-sdk/commit/a26165aee025d302bc2c9a430917fa5a4bd0fb8b))
+* change the default wallet to dapp-svelte-wallet ([6722f23](https://github.com/Agoric/agoric-sdk/commit/6722f2384d4cfe65a0fc8a79ae0a03e1fbcb62e8))
+* clean up E.when and E.resolve ([#1561](https://github.com/Agoric/agoric-sdk/issues/1561)) ([634046c](https://github.com/Agoric/agoric-sdk/commit/634046c0fc541fc1db258105a75c7313b5668aa0))
+* clear up and solve the races around ag-solo initialisation ([f6482ac](https://github.com/Agoric/agoric-sdk/commit/f6482ac7f5f01cc4c7626610e81c191fd939c69a))
+* commit kernel state in END_BLOCK, for reset robustness ([96d4912](https://github.com/Agoric/agoric-sdk/commit/96d491255baa1bbaf17716e54f68947c13a50ad4))
+* correct and simplify the bootstrap process ([cb95764](https://github.com/Agoric/agoric-sdk/commit/cb9576453bec3b375c75abea055a09066e719dd7))
+* ensure all presences are resolved before creating bundle ([c66e58c](https://github.com/Agoric/agoric-sdk/commit/c66e58c948236eccac9cc3ecdaf1777e9c6464d4))
+* force `--pruning=nothing` until we upgrade to Stargate ([9a3d54b](https://github.com/Agoric/agoric-sdk/commit/9a3d54bac54a92babe6fa1610c2a8c88f85a1e6a))
+* get fake-chain working again, also with async commit ([8b30196](https://github.com/Agoric/agoric-sdk/commit/8b30196f54f6a608c4c0e3e4587e3500e4e67ffd))
+* get git-revision.txt when out of tree ([3275022](https://github.com/Agoric/agoric-sdk/commit/32750224fa7009e8090d9e505225f477c777edaa))
+* improve wallet contents migration, but still not great ([650f4f5](https://github.com/Agoric/agoric-sdk/commit/650f4f584b8d724260479e003da92033b626d863))
+* make local.vattp and agoric.vattp symmetrical ([9b366d0](https://github.com/Agoric/agoric-sdk/commit/9b366d02667404fca7fa88ee1c70f0e27b9fd209))
+* make scenario2 Makefile rules work again ([3c2647a](https://github.com/Agoric/agoric-sdk/commit/3c2647aa5a22c785600f9dbef7a328841ba37607))
+* match notifier semantics to async iterables ([#1332](https://github.com/Agoric/agoric-sdk/issues/1332)) ([efbf359](https://github.com/Agoric/agoric-sdk/commit/efbf359e7f1b4ca0eb07e3ae8a12e1f061758927))
+* persist the savedChainSends for better recovery ([d8f0eb6](https://github.com/Agoric/agoric-sdk/commit/d8f0eb6b900bdac6c8d110c05c1af38b76df462e))
+* properly abort all communication when CapTP is disconnected ([c2c0196](https://github.com/Agoric/agoric-sdk/commit/c2c0196001c2bc94d14645272b931e39ee38c197))
+* Protect ag-solo script from shells with prompt strings ($PS1) ([3d5cbe3](https://github.com/Agoric/agoric-sdk/commit/3d5cbe3ad9ea9d3829b5d4de7691bef50c544ea2))
+* quieter CapTP disconnections on the ag-solo side ([6bfe9d6](https://github.com/Agoric/agoric-sdk/commit/6bfe9d64be3cd56a69191e2f22769109162fe50a))
+* rearrange `home` into `local` and `agoric` ([44ba391](https://github.com/Agoric/agoric-sdk/commit/44ba391db3551b40f5a45ba68cc4e0b7689a8299))
+* reduce inconsistency among our linting rules ([#1492](https://github.com/Agoric/agoric-sdk/issues/1492)) ([b6b675e](https://github.com/Agoric/agoric-sdk/commit/b6b675e2de110e2af19cad784a66220cab21dacf))
+* remove --pruning=nothing flag, as it's unneeded ([48e1a40](https://github.com/Agoric/agoric-sdk/commit/48e1a40d4a439058d1fb9388f86d8532416a2e45))
+* remove $BOOT_ADDRESS support ([3fd1e1d](https://github.com/Agoric/agoric-sdk/commit/3fd1e1de35a471287432737e5f16763d4d35040e))
+* remove dynamic role from sim-chain ([1a3dd57](https://github.com/Agoric/agoric-sdk/commit/1a3dd57415c452f9527d9ccfe2c2f81429fd3e23))
+* remove more BOOTSTRAP_ADDRESS references ([f2141b6](https://github.com/Agoric/agoric-sdk/commit/f2141b68fe8f239e575e4a4dc7e6be70b1ffc7f0))
+* remove more controller references ([c9af5a1](https://github.com/Agoric/agoric-sdk/commit/c9af5a11ac5ffa1afcbc47c6399f35945055e3b2))
+* remove obsolete bundle command ([e87fecc](https://github.com/Agoric/agoric-sdk/commit/e87fecc1431c8c13bd26b9dbb678bcd29615fafd))
+* remove one layer of caching (the mailbox state) ([50b1d7e](https://github.com/Agoric/agoric-sdk/commit/50b1d7e65375c137c8d70093a3f115955d10dec7))
+* remove remaining set-json.js instances ([987426f](https://github.com/Agoric/agoric-sdk/commit/987426f98fc4da01e32034df3f962c731fa0f6bb))
+* remove unnecessary types ([e242143](https://github.com/Agoric/agoric-sdk/commit/e24214342062f908ebee91a775c0427abc21e263))
+* rename producePromise to makePromiseKit ([#1329](https://github.com/Agoric/agoric-sdk/issues/1329)) ([1d2925a](https://github.com/Agoric/agoric-sdk/commit/1d2925ad640cce7b419751027b44737bd46a6d59))
+* silence more debug messages ([e5ffb67](https://github.com/Agoric/agoric-sdk/commit/e5ffb6786126cad7a20b85039ffdbab1fc6c9d11))
+* since we don't simulate, make sure our gas estimate is good ([a0a2df5](https://github.com/Agoric/agoric-sdk/commit/a0a2df5e614bc64a2ceddb4f988ba52dc611ffad))
+* upgrade Docker images to Debian buster ([1016cc5](https://github.com/Agoric/agoric-sdk/commit/1016cc5fa27624d2265398d8900f2d4847c9864f))
+* use and export x/swingset/storage for all on-chain storage ([c6bf0e2](https://github.com/Agoric/agoric-sdk/commit/c6bf0e26cdcc4ecd78ba2bdbe7a29463d52da36a))
+* **ag-nchainz:** give solo vats the `agoric.vattp` power ([a58bbba](https://github.com/Agoric/agoric-sdk/commit/a58bbbaaea964dd2423586dde330803fb6176c31))
+
+
+### Features
+
+* add `ag-setup-solo` compatibility, `ag-solo setup` ([4abe446](https://github.com/Agoric/agoric-sdk/commit/4abe4468a0626c2adfd170459c26c3fe973595a0))
+* add a stub for decentralised web (dweb) ([d81b1f2](https://github.com/Agoric/agoric-sdk/commit/d81b1f262f365a994e2d5e29ff0aa027ed7b2841))
+* allow dapps to suggest a petname that is forwarded ([1183a19](https://github.com/Agoric/agoric-sdk/commit/1183a19d5887f62af4ac14cded91c3685df65c2d))
+* allow dapps to suggest petnames for issuer/brand, instance, installation ([#1308](https://github.com/Agoric/agoric-sdk/issues/1308)) ([0eb378b](https://github.com/Agoric/agoric-sdk/commit/0eb378bdd70fe008e535e818148a915c3f3db34c))
+* defer the wallet UI until the start process ([18ee099](https://github.com/Agoric/agoric-sdk/commit/18ee0990836280478917265bbab966dee15e3dfe))
+* ERTP v0.7.0 ([#1317](https://github.com/Agoric/agoric-sdk/issues/1317)) ([2d66b5a](https://github.com/Agoric/agoric-sdk/commit/2d66b5ae1feaeef1024fc6bfac7066a385ed5207)), closes [#1306](https://github.com/Agoric/agoric-sdk/issues/1306) [#1305](https://github.com/Agoric/agoric-sdk/issues/1305)
+* implement wallet upgrade, though not for dapp-react-wallet ([8945ebb](https://github.com/Agoric/agoric-sdk/commit/8945ebb695d42f5124495275d3412b721f1cfc07))
+* make production Zoe use prebundled zcf ([138ddd7](https://github.com/Agoric/agoric-sdk/commit/138ddd70cba6e1b11a4a8c0d59f15a018f8bb0e6))
+* make Zoe in cosmic-swingset work with prebundled zcf ([2859650](https://github.com/Agoric/agoric-sdk/commit/285965047ba92608b39d9fa496b1bf2b952d748d))
+* provision without Python ([1fdc1d3](https://github.com/Agoric/agoric-sdk/commit/1fdc1d31e7684705ebaf337be19271dbcdd9cbdc))
+* **vattp:** allow specifying a console object for logging ([ae1a2a0](https://github.com/Agoric/agoric-sdk/commit/ae1a2a03bf2f823b5420b8777ec6c436cbb4b349))
+* plumb up the chainID into BEGIN_BLOCK and AG_COSMOS_INIT ([23aa90d](https://github.com/Agoric/agoric-sdk/commit/23aa90d5750a0c3776613febffd8c388f4680861))
+* reintroduce anylogger as the console endowment ([98cd5cd](https://github.com/Agoric/agoric-sdk/commit/98cd5cd5c59e9121169bb8104b70c63ccc7f5f01))
+* separate wallet implementation from ag-solo ([0bf7eab](https://github.com/Agoric/agoric-sdk/commit/0bf7eab1f575a8805e3908f38271cd3ce1bff053))
+* use debugName to differentiate sim-chain instances ([0efc33f](https://github.com/Agoric/agoric-sdk/commit/0efc33fafbeefeff587f94251dc3052179b17642))
+* **cosmic-swingset:** add attenuated vattp to fake chain clients ([e6f6aeb](https://github.com/Agoric/agoric-sdk/commit/e6f6aeb6ed64ccf5608cbe6e26fd429283ab8a2e))
+* **cosmic-swingset:** send powerFlags from tx provision-one ([5b68af5](https://github.com/Agoric/agoric-sdk/commit/5b68af594b5c8ea0732eb70aeae8ed5139b7b6cb))
+
+
+
+
+
 # [0.19.0](https://github.com/Agoric/agoric-sdk/compare/@agoric/cosmic-swingset@0.18.0...@agoric/cosmic-swingset@0.19.0) (2020-06-30)
 
 

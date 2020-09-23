@@ -4,12 +4,14 @@ import { makeMarshal } from '@agoric/marshal';
 import makeStore from '@agoric/store';
 import { assert, details, q } from '@agoric/assert';
 
+/* eslint-disable jsdoc/valid-types */
 /**
  * @typedef {string[]} Path
  * @typedef {{} & 'Strongname'} Strongname
  * @param {any} x
  * @returns {x is Path}
  */
+/* eslint-enable jsdoc/valid-types */
 export const isPath = x => {
   if (!Array.isArray(x)) {
     return false;
@@ -334,7 +336,7 @@ export const makeDehydrator = (initialUnnamedCount = 0) => {
     return placeholderName;
   };
 
-  const convertNameToVal = ({ kind, petname }) => {
+  const convertNameToVal = ({ kind, petname }, _iface = undefined) => {
     const { petnameToVal } = petnameKindToMapping.get(kind);
     return petnameToVal.get(petname);
   };
