@@ -109,7 +109,7 @@ export function makeNodeSubprocessFactory(tools) {
     // start the worker and establish a connection
     const { fromChild, toChild, terminate, done } = startSubprocessWorker();
 
-    /** @type {(msg: Serializable[]) => void} */
+    /** @type {(msg: unknown[]) => void} */
     function sendToWorker(msg) {
       assert(Array.isArray(msg));
       toChild.write(msg);
@@ -120,7 +120,7 @@ export function makeNodeSubprocessFactory(tools) {
       promise: dispatchReadyP,
       resolve: dispatchIsReady,
     } = makePromiseKit();
-    /** @type {null | ((r: Serializable[]) => void) } */
+    /** @type {null | ((r: unknown[]) => void) } */
     let waiting = null;
 
     /** @type {(data: unknown) => void} */
@@ -162,8 +162,8 @@ export function makeNodeSubprocessFactory(tools) {
     sendToWorker(['setBundle', bundle, vatParameters]);
 
     /**
-     * @param {Serializable[]} delivery
-     * @returns {Promise<Serializable[]>}
+     * @param {unknown[]} delivery
+     * @returns {Promise<unknown[]>}
      */
     function deliver(delivery) {
       parentLog(`sending delivery`, delivery);
