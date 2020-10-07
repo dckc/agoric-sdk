@@ -25,10 +25,10 @@ test.before(async t => {
   t.context.data = { kernelBundles };
 });
 
-test('terminate', async t => {
+async function doTerminate(t, mode, reference, extraMessage = []) {
   const configPath = path.resolve(__dirname, 'swingset-terminate.json');
   const config = loadSwingsetConfigFile(configPath);
-  const controller = await buildVatController(config, [], t.context.data);
+  const controller = await buildVatController(config, [mode], t.context.data);
   t.is(controller.kpStatus(controller.bootstrapResult), 'pending');
   await controller.run();
   t.is(controller.kpStatus(controller.bootstrapResult), 'fulfilled');
@@ -45,10 +45,71 @@ test('terminate', async t => {
     'query2 2',
     'QUERY 3',
     'GOT QUERY 3',
-    'foreverP.catch vat terminated',
-    'query3P.catch vat terminated',
-    'foo4P.catch vat terminated',
-    'afterForeverP.catch vat terminated',
+    ...extraMessage,
+    'foreverP.catch Error: vat terminated',
+    'query3P.catch Error: vat terminated',
+    'foo4P.catch Error: vat terminated',
+    'afterForeverP.catch Error: vat terminated',
+    reference,
+    'done',
+  ]);
+}
+
+test('terminate', async t => {
+  await doTerminate(t, 'kill', 'done exception kill (Error=false)');
+});
+
+test('exit happy path simple result', async t => {
+  await doTerminate(t, 'happy', 'done result happy (Error=false)');
+});
+
+test('exit happy path complex result', async t => {
+  await doTerminate(
+    t,
+    'exceptionallyHappy',
+    'done result Error: exceptionallyHappy (Error=true)',
+  );
+});
+
+test('exit sad path simple result', async t => {
+  await doTerminate(t, 'sad', 'done exception sad (Error=false)');
+});
+
+test('exit sad path complex result', async t => {
+  await doTerminate(
+    t,
+    'exceptionallySad',
+    'done exception Error: exceptionallySad (Error=true)',
+  );
+});
+
+test('exit happy path with ante-mortem message', async t => {
+  await doTerminate(
+    t,
+    'happyTalkFirst',
+    'done result happyTalkFirst (Error=false)',
+    ['GOT QUERY not dead quite yet'],
+  );
+});
+
+test('exit sad path with ante-mortem message', async t => {
+  await doTerminate(
+    t,
+    'sadTalkFirst',
+    'done exception Error: sadTalkFirst (Error=true)',
+    ['GOT QUERY not dead quite yet (but soon)'],
+  );
+});
+
+test('exit with presence', async t => {
+  const configPath = path.resolve(__dirname, 'swingset-die-with-presence.json');
+  const config = loadSwingsetConfigFile(configPath);
+  const controller = await buildVatController(config, [], t.context.data);
+  await controller.run();
+  t.deepEqual(controller.dump().log, [
+    'preparing dynamic vat',
+    'done message: your ad here',
+    'talkback from beyond?',
     'done',
   ]);
 });
@@ -69,7 +130,8 @@ test('dispatches to the dead do not harm kernel', async t => {
       'w: p1 = before',
       `w: I ate'nt dead`,
       'b: p1b = I so resolve',
-      'b: p2b fails vat terminated',
+      'b: p2b fails Error: vat terminated',
+      'done: arbitrary reason',
     ]);
   }
   const state1 = getAllState(storage1);
@@ -91,8 +153,9 @@ test('dispatches to the dead do not harm kernel', async t => {
     t.is(c2.kpStatus(r2), 'fulfilled');
     t.deepEqual(c2.dump().log, [
       'b: p1b = I so resolve',
-      'b: p2b fails vat terminated',
-      'm: live 2 failed: vat terminated',
+      'b: p2b fails Error: vat terminated',
+      'done: arbitrary reason',
+      'm: live 2 failed: Error: vat terminated',
     ]);
   }
 });

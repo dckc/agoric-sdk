@@ -1,6 +1,7 @@
 import { assert } from '@agoric/assert';
 import { assertKnownOptions } from '../assertOptions';
 import { makeVatSlot } from '../parseVatSlots';
+import { insistCapData } from '../capdata';
 
 export function makeVatRootObjectSlot() {
   return makeVatSlot('object', true, 0);
@@ -66,14 +67,18 @@ export function makeVatLoader(stuff) {
   }
 
   const allowedDynamicOptions = [
+    'description',
     'metered',
+    'managerType',
     'vatParameters',
     'enableSetup',
     'enablePipelining',
   ];
 
   const allowedStaticOptions = [
+    'description',
     'vatParameters',
+    'managerType',
     'enableSetup',
     'enablePipelining',
   ];
@@ -131,10 +136,6 @@ export function makeVatLoader(stuff) {
     if (!vatSourceBundle) {
       throw Error(`Bundle ${source.bundleName} not found`);
     }
-    // TODO: maybe hash the bundle object somehow for the description
-    const description = source.bundle
-      ? '(source bundle)'
-      : `from: ${source.bundleName}`;
 
     assertKnownOptions(
       options,
@@ -148,7 +149,14 @@ export function makeVatLoader(stuff) {
     } = options;
     let terminated = false;
 
-    function notifyTermination(error) {
+    // TODO: maybe hash the bundle object somehow for the description
+    const sourceDesc = source.bundle
+      ? '(from source bundle)'
+      : `(from bundleName: ${source.bundleName})`;
+    const description = `${options.description || ''} ${sourceDesc}`;
+
+    function notifyTermination(shouldReject, info) {
+      insistCapData(info);
       if (terminated) {
         return;
       }
@@ -156,14 +164,12 @@ export function makeVatLoader(stuff) {
       const vatAdminVatId = vatNameToID('vatAdmin');
       const vatAdminRootObjectSlot = makeVatRootObjectSlot();
 
+      // Embedding the info capdata into the arguments list, taking advantage of
+      // the fact that neither vatID (which is a string) nor shouldReject (which
+      // is a boolean) can contain any slots.
       const args = {
-        body: JSON.stringify([
-          vatID,
-          error
-            ? { '@qclass': 'error', name: error.name, message: error.message }
-            : { '@qclass': 'undefined' },
-        ]),
-        slots: [],
+        body: JSON.stringify([vatID, shouldReject, JSON.parse(info.body)]),
+        slots: info.slots,
       };
 
       queueToExport(
@@ -180,14 +186,14 @@ export function makeVatLoader(stuff) {
         throw Error(`vat creation requires a bundle, not a plain string`);
       }
 
-      kernelSlog.addVat(vatID, isDynamic, description);
+      kernelSlog.addVat(vatID, isDynamic, description, vatSourceBundle);
       const managerOptions = {
         bundle: vatSourceBundle,
         metered,
         enableSetup,
         enablePipelining,
         enableInternalMetering: !isDynamic,
-        notifyTermination: metered ? notifyTermination : undefined,
+        notifyTermination,
         vatConsole: makeVatConsole(vatID),
         vatParameters,
       };
