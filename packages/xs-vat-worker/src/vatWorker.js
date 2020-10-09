@@ -42,52 +42,49 @@ function makeConsole(_tag) {
 /**
  *
  * @param {typeof setImmediate} setImmediate
- * @returns { Promise<unknown> }
+ * @returns { () => Promise<void> }
  */
-function waitUntilQuiescent(setImmediate) {
-  return new Promise((resolve, _reject) => {
-    setImmediate(() => {
-      // console.log('hello from setImmediate callback. The promise queue is presumably empty.');
-      resolve();
+function makeWait(setImmediate) {
+  return function waitUntilQuiescent() {
+    return new Promise((resolve, _reject) => {
+      setImmediate(() => {
+        // console.log('hello from setImmediate callback. The promise queue is presumably empty.');
+        resolve();
+      });
     });
-  });
+  };
 }
 
 /**
- * @param {(it: unknown) => Promise<any>} f
- * @param {string} errmsg
- * @param {typeof setImmediate } setImmediate
- */
-function runAndWait(f, errmsg, setImmediate) {
-  Promise.resolve()
-    .then(f)
-    .then(undefined, err => workerLog(`doProcess: ${errmsg}:`, err));
-  return waitUntilQuiescent(setImmediate);
-}
-
-/**
- *
- * @param {{
- *   readMessage: (eof: Error) => string,
- *   writeMessage: (msg: string) => void,
- * }} io
- * @param { typeof setImmediate } setImmediate
- *
  * @typedef {Readonly<['ok'] | ['error', string]>} WorkerResult
  */
-function makeWorker(io, setImmediate) {
-  /** @type {{[method: string]: (...args: unknown[]) => Promise<unknown> }} */
-  let dispatch;
+
+/**
+ *
+ * @param {Record<string, unknown>} vatNS
+ * @param {unknown} vatParameters
+ * @param {{
+ *   callParent: (request: unknown[]) => unknown,
+ *   waitUntilQuiescent: () => Promise<void>
+ * }} io
+ */
+function makeWorker(vatNS, vatParameters, { callParent, waitUntilQuiescent }) {
+  /**
+   * @param {(it: unknown) => Promise<any>} f
+   * @param {string} errmsg
+   */
+  function runAndWait(f, errmsg) {
+    Promise.resolve()
+      .then(f)
+      .then(undefined, err => workerLog(`doProcess: ${errmsg}:`, err));
+    return waitUntilQuiescent();
+  }
 
   /** @type {(d: [string, ...unknown[]], errmsg: string) => Promise<WorkerResult> } */
   async function doProcess(dispatchRecord, errmsg) {
     const [dispatchOp, ...dispatchArgs] = dispatchRecord;
     workerLog(`runAndWait`);
-    await runAndWait(
-      () => dispatch[dispatchOp](...dispatchArgs),
-      errmsg,
-      setImmediate,
-    );
+    await runAndWait(() => dispatch[dispatchOp](...dispatchArgs), errmsg);
     workerLog(`doProcess done`);
     const vatDeliveryResults = harden(['ok']);
     // @ts-ignore not sure why tsc doesn't grok here
@@ -95,7 +92,7 @@ function makeWorker(io, setImmediate) {
   }
 
   /**
-   * @param {string} targetSlot
+   * @param {unknown} targetSlot
    * @param {Message} msg
    * @returns {Promise<WorkerResult>}
    */
@@ -149,7 +146,7 @@ function makeWorker(io, setImmediate) {
    *   ['reject', PromiseReference, unknown]
    * >} VatSyscall
    */
-  function sendUplink(msg) {
+  function sendUplinkXXX(msg) {
     assert(msg instanceof Array, `msg must be an Array`);
     io.writeMessage(JSON.stringify(msg));
   }
@@ -159,110 +156,76 @@ function makeWorker(io, setImmediate) {
   //  toParent.write('child ack');
   // });
 
-  /** @type { (msg: unknown) => Promise<string | undefined> } */
-  const handle = harden(async msg => {
-    const type = Array.isArray(msg) && msg.length >= 1 ? msg[0] : typeof msg;
-    /** @type {unknown[]} */
-    const margs = Array.isArray(msg) ? msg.slice(1) : [];
+  /** @type { (vatSysCall: VatSyscall) => void } */
+  function doSyscall(vatSyscallObject) {
+    sendUplink(['syscall', ...vatSyscallObject]);
+  }
+  const syscall = harden({
+    /** @type { (target: Reference, msg: Message) => void } */
+    send: (target, smsg) => doSyscall(['send', target, smsg]),
+    /** @type { (target: Reference, method: string, args: CapData) => void } */
+    callNow: (_target, _method, _args) => {
+      throw Error(`nodeWorker cannot syscall.callNow`);
+    },
+    /** @type { (vpd: PromiseReference) => void } */
+    subscribe: vpid => doSyscall(['subscribe', vpid]),
+    /** @type { (vpid: PromiseReference, data: unknown) => void } */
+    fulfillToData: (vpid, data) => doSyscall(['fulfillToData', vpid, data]),
+    /** @type { (vpid: PromiseReference, slot: Reference) => void } */
+    fulfillToPresence: (vpid, slot) =>
+      doSyscall(['fulfillToPresence', vpid, slot]),
+    /** @type { (vpid: PromiseReference, data: unknown) => void } */
+    reject: (vpid, data) => doSyscall(['reject', vpid, data]),
+  });
 
-    workerLog(`received`, type);
-    if (type === 'start') {
-      // TODO: parent should send ['start', vatID]
-      workerLog(`got start`);
-      sendUplink(['gotStart']);
-    } else if (type === 'setBundle') {
-      const [bundle, vatParameters] = margs;
-      const endowments = {
-        console: makeConsole(`SwingSet:vatWorker`),
-        // @ts-ignore  TODO: how to get type of HandledPromise?
-        HandledPromise,
-      };
-      // ISSUE: this draft code is contorted because it started
-      // as code that didn't return anything but now it
-      // has to return a promise to be resolved before
-      // reading the next input.
-      return importBundle(bundle, { endowments }).then(vatNS => {
-        workerLog(`got vatNS:`, Object.keys(vatNS).join(','));
-        sendUplink(['gotBundle']);
+  function testLog(/** @type {unknown[]} */ ...args) {
+    sendUplink(['testLog', ...args]);
+  }
+  /** @type { unknown } */
+  const state = null;
+  const vatID = 'demo-vatID';
+  // todo: maybe add transformTildot, makeGetMeter/transformMetering to
+  // vatPowers, but only if options tell us they're wanted. Maybe
+  // transformTildot should be async and outsourced to the kernel
+  // process/thread.
+  const vatPowers = {
+    Remotable,
+    getInterfaceOf,
+    makeMarshal,
+    testLog,
+  };
+  /** @type {{[method: string]: (...args: unknown[]) => Promise<unknown> }} */
+  const dispatch = makeLiveSlots(
+    syscall,
+    state,
+    vatNS.buildRootObject,
+    vatID,
+    vatPowers,
+    vatParameters,
+  );
+  workerLog(`got dispatch:`, Object.keys(dispatch).join(','));
 
-        /** @type { (vatSysCall: VatSyscall) => void } */
-        function doSyscall(vatSyscallObject) {
-          sendUplink(['syscall', ...vatSyscallObject]);
-        }
-        const syscall = harden({
-          /** @type { (target: Reference, msg: Message) => void } */
-          send: (target, smsg) => doSyscall(['send', target, smsg]),
-          /** @type { (target: Reference, method: string, args: CapData) => void } */
-          callNow: (_target, _method, _args) => {
-            throw Error(`nodeWorker cannot syscall.callNow`);
-          },
-          /** @type { (vpd: PromiseReference) => void } */
-          subscribe: vpid => doSyscall(['subscribe', vpid]),
-          /** @type { (vpid: PromiseReference, data: unknown) => void } */
-          fulfillToData: (vpid, data) =>
-            doSyscall(['fulfillToData', vpid, data]),
-          /** @type { (vpid: PromiseReference, slot: Reference) => void } */
-          fulfillToPresence: (vpid, slot) =>
-            doSyscall(['fulfillToPresence', vpid, slot]),
-          /** @type { (vpid: PromiseReference, data: unknown) => void } */
-          reject: (vpid, data) => doSyscall(['reject', vpid, data]),
-        });
-
-        function testLog(/** @type {unknown[]} */ ...args) {
-          sendUplink(['testLog', ...args]);
-        }
-        /** @type { unknown } */
-        const state = null;
-        const vatID = 'demo-vatID';
-        // todo: maybe add transformTildot, makeGetMeter/transformMetering to
-        // vatPowers, but only if options tell us they're wanted. Maybe
-        // transformTildot should be async and outsourced to the kernel
-        // process/thread.
-        const vatPowers = {
-          Remotable,
-          getInterfaceOf,
-          makeMarshal,
-          testLog,
-        };
-        dispatch = makeLiveSlots(
-          syscall,
-          state,
-          vatNS.buildRootObject,
-          vatID,
-          vatPowers,
-          vatParameters,
-        );
-        workerLog(`got dispatch:`, Object.keys(dispatch).join(','));
-        sendUplink(['dispatchReady']);
-        return type;
-      });
-    } else if (type === 'deliver') {
-      if (!dispatch) {
-        workerLog(`error: deliver before dispatchReady`);
-        return undefined;
+  /** @type { (dtype: string, ...dargs: unknown[]) => Promise<WorkerResult> } */
+  function deliver(dtype, ...dargs) {
+    switch (dtype) {
+      case 'message': {
+        const [target, args] = dargs;
+        return doMessage(target, asMessage(args));
       }
-      const [dtype, ...dargs] = margs;
-      if (dtype === 'message' && typeof dargs[0] === 'string') {
-        await doMessage(dargs[0], asMessage(dargs[1])).then(res =>
-          sendUplink(['deliverDone', ...res]),
-        );
-      } else if (dtype === 'notify' && typeof dargs[0] === 'string') {
+
+      case 'notify': {
         /** @type { Resolution } */
         // @ts-ignore  WARNING: assuming type of input data
         const resolution = dargs[1];
-        await doNotify(dargs[0], resolution).then(res =>
-          sendUplink(['deliverDone', ...res]),
-        );
-      } else {
-        throw Error(`bad delivery type ${dtype}`);
+        return doNotify(dargs[0], resolution);
       }
-    } else {
-      workerLog(`unrecognized downlink message ${type}`);
-    }
-    return type;
-  });
 
-  return harden({ handle });
+      default:
+        throw Error(`bad delivery type ${dtype}`);
+    }
+  }
+
+  return harden({ deliver });
 }
 
 /**
@@ -276,8 +239,85 @@ function makeWorker(io, setImmediate) {
 export async function main({ readMessage, writeMessage, setImmediate }) {
   workerLog(`supervisor started`);
 
-  const worker = makeWorker({ readMessage, writeMessage }, setImmediate);
+  const waitUntilQuiescent = makeWait(setImmediate);
   const EOF = new Error('EOF');
+
+  /** @type {Record<string, VatWorker>} */
+  const workerByVatID = {};
+
+  /** @type { (request: unknown) => unknown } */
+  function callParent(request) {
+    writeMessage(JSON.stringify(request));
+    let txt;
+    try {
+      txt = readMessage(EOF);
+    } catch (ex) {
+      if (ex === EOF) {
+        throw new Error(`unexpected EOF in reply to ${request}`);
+      }
+      throw ex;
+    }
+    let result;
+    try {
+      result = JSON.parse(txt);
+    } catch (badJSON) {
+      throw new Error(`bad JSON in reply to ${request}: ${badJSON.message}`);
+    }
+    return result;
+  }
+
+  /** @type {(msg: unknown) => Promise<null | 'STOP' | unknown[]>} */
+  async function handle(msg) {
+    const type = Array.isArray(msg) && msg.length >= 1 ? msg[0] : typeof msg;
+    /** @type { unknown[] } */
+    const margs = Array.isArray(msg) ? msg.slice(1) : [];
+
+    const theWorker = vatID => {
+      const worker = workerByVatID[vatID];
+      if (!worker) throw new Error(`unknown vatID ${vatID}`);
+      return worker;
+    };
+
+    workerLog(`received`, type);
+    switch (type) {
+      case 'start':
+        // TODO: parent should send ['start', vatID]
+        workerLog(`got start`);
+        return ['gotStart'];
+      case 'setBundle': {
+        const [vatID, bundle, vatParameters] = margs;
+        if (typeof vatID !== 'string') throw new Error(`bad vatID ${vatID}`);
+        if (vatID in workerByVatID)
+          throw new Error(`vat ${vatID} already has bundle.`);
+
+        const endowments = {
+          console: makeConsole(`SwingSet:vatWorker`),
+          // @ts-ignore  TODO: how to get type of HandledPromise?
+          HandledPromise,
+        };
+        const vatNS = await importBundle(bundle, { endowments });
+        workerLog(`got vatNS:`, Object.keys(vatNS).join(','));
+
+        const worker = makeWorker(vatNS, vatParameters, {
+          waitUntilQuiescent,
+          callParent,
+        });
+        workerByVatID[vatID] = worker;
+        return ['dispatchReady'];
+      }
+
+      case 'deliver': {
+        const [vatID, dtype, ...dargs] = margs;
+        const worker = theWorker(vatID);
+        const res = await worker.deliver(dtype, ...dargs);
+        return ['deliverDone', ...res];
+      }
+
+      default:
+        workerLog(`unrecognized downlink message ${type}`);
+        return null;
+    }
+  }
 
   for (;;) {
     /** @type { unknown } */
@@ -293,9 +333,16 @@ export async function main({ readMessage, writeMessage, setImmediate }) {
       continue;
     }
     // eslint-disable-next-line no-await-in-loop
-    const msgtype = await worker.handle(message);
-    if (msgtype === 'finish') {
+    const reply = await handle(message);
+    if (reply === 'STOP') {
       break;
+    }
+    if (Array.isArray(reply)) {
+      // odd protocol has 2 replies to setBundle
+      if (reply[0] === 'dispatchReady') {
+        writeMessage(JSON.stringify(['gotBundle']));
+      }
+      writeMessage(JSON.stringify(reply));
     }
   }
 }
