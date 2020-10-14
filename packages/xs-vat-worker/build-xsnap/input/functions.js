@@ -110,7 +110,7 @@ export function setBundle(vatSourceBundle, vatParameters) {
   const endowments = {
     console: makeConsole(`SwingSet:vatWorker`),
   };
-  importBundle(vatSourceBundle, { endowments }).then(vatNS => {
+  return importBundle(vatSourceBundle, { endowments }).then(vatNS => {
     workerLog(`got vatNS:`, Object.keys(vatNS).join(','));
     sendUplink(['gotBundle']);
 
