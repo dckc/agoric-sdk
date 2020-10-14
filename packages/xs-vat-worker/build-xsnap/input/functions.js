@@ -8,6 +8,18 @@ import { mustBeSameStructure } from '@agoric/same-structure';
 import { waitUntilQuiescent } from '@agoric/swingset-vat/src/waitUntilQuiescent';
 import { makeLiveSlots } from '@agoric/swingset-vat/src/kernel/liveSlots';
 
+// Install HandledPromise global
+import '@agoric/eventual-send/shim';
+
+// Replace Compartment constructor with one that also provides HandledPromise, harden.
+globalThis.Compartment = (OldCompartment =>
+  function Compartment(endowments, ...args) {
+    return new OldCompartment(
+      { HandledPromise, harden, ...endowments },
+      ...args,
+    );
+  })(Compartment);
+
 // eslint-disable-next-line no-unused-vars
 function workerLog(first, ...args) {
   // console.error(`---worker: ${first}`, ...args);
