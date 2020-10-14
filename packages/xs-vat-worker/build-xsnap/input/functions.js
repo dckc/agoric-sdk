@@ -12,13 +12,15 @@ import { makeLiveSlots } from '@agoric/swingset-vat/src/kernel/liveSlots';
 import '@agoric/eventual-send/shim';
 
 // Replace Compartment constructor with one that also provides HandledPromise, harden.
-globalThis.Compartment = (OldCompartment =>
-  function Compartment(endowments, ...args) {
-    return new OldCompartment(
-      { HandledPromise, harden, ...endowments },
-      ...args,
-    );
-  })(Compartment);
+if (typeof Compartment === 'function') {
+  globalThis.Compartment = (OldCompartment =>
+    function Compartment(endowments, ...args) {
+      return new OldCompartment(
+        { HandledPromise, harden, ...endowments },
+        ...args,
+      );
+    })(Compartment);
+}
 
 // eslint-disable-next-line no-unused-vars
 function workerLog(first, ...args) {
