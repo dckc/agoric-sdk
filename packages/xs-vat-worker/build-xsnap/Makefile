@@ -20,7 +20,7 @@ run-node:
 	# this only runs the setup step
 	node -r esm output/build.js
 
-bundle-functions-xsnap.js: input/functions.js
+bundle-functions-xsnap.js: input/functions.js input/harden.js
 	yarn exec -- rollup --config rollup-config-xsnap.js
 output-xsnap: bundle-functions-xsnap.js slog.out
 	node -r esm ./convert-slog-to-xsnap.js slog.out v1 --xsnap output

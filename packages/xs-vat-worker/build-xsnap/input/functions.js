@@ -1,5 +1,7 @@
 /* global harden */
 
+import './harden.js';
+
 // import anylogger from 'anylogger';
 import { assert } from '@agoric/assert';
 import { importBundle } from '@agoric/import-bundle';
@@ -24,14 +26,22 @@ if (typeof Compartment === 'function') {
 
 // eslint-disable-next-line no-unused-vars
 function workerLog(first, ...args) {
-  // console.error(`---worker: ${first}`, ...args);
+  console.log(`---worker: ${first}`, ...args);
 }
 
 workerLog(`supervisor started`);
 
 function makeConsole(tag) {
   // const log = anylogger(tag);
-  const log = console;
+  // const log = console;
+  const show = (...args) => print(`${JSON.stringify(args)}`);
+  const log = {
+    debug: show,
+    log: show,
+    info: show,
+    warn: show,
+    error: show,
+  };
   const cons = {};
   for (const level of ['debug', 'log', 'info', 'warn', 'error']) {
     cons[level] = log[level];

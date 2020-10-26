@@ -9,6 +9,6 @@ export default {
     exports: 'named',
     format: 'es',
     sourcemap: false,
-    intro: 'const harden = Object.freeze;',
+    // intro: 'const harden = x => Object.freeze(x, true);',
   },
 };
