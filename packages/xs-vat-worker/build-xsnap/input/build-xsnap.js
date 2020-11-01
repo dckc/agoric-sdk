@@ -4,7 +4,7 @@ import { setBundle } from './bundle-functions.js';
 import { vatSourceBundle } from './vatSourceBundle.js';
 
 async function run() {
-  await setBundle(vatSourceBundle, {});
+  await setBundle(vatSourceBundle, {name: 'alice'});
   console.log(`did setBundle`);
 }
 
