@@ -2,6 +2,9 @@
 ## targets to build xsnap test files
 SRUNNER=../../swingset-runner
 
+# MODDABLE=/home/connolly/projects/moddable
+XSNAP=$(MODDABLE)/build/bin/lin/debug/xsnap
+
 slog.out:
 	node -r esm $(SRUNNER)/bin/runner --slog slog.out --init --config $(SRUNNER)/demo/exchangeBenchmark/swingset.json --benchmark 1 run -- --prime
 
@@ -28,4 +31,4 @@ bundle-functions-xsnap.js: input/functions.js input/harden.js
 output-xsnap: bundle-functions-xsnap.js slog.out
 	node -r esm ./convert-slog-to-xsnap.js slog.out v1 --xsnap output
 run-xsnap:
-	xsnap -m output/build.js
+	$(XSNAP) -m output/build.js
