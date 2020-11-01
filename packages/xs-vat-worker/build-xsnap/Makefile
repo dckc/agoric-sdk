@@ -9,6 +9,9 @@ slog.out:
 list-vats: slog.out
 	node -r esm ./convert-slog-to-xsnap.js slog.out
 
+clean:
+	rm -rf bundle-functions-xsnap.js ./output
+
 clean-output:
 	rm -rf output
 
