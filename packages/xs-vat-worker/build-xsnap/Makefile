@@ -29,6 +29,6 @@ run-node:
 bundle-functions-xsnap.js: input/functions.js input/harden.js
 	yarn exec -- rollup --config rollup-config-xsnap.js
 output-xsnap: bundle-functions-xsnap.js slog.out
-	node -r esm ./convert-slog-to-xsnap.js slog.out v1 --xsnap output
+	node -r esm ./convert-slog-to-xsnap.js slog.out v3 --xsnap output
 run-xsnap:
 	$(XSNAP) -m output/build.js
