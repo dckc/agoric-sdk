@@ -11,13 +11,15 @@ const { freeze, keys } = Object;
  * originally based on code from Paul Roub Aug 2014
  * https://stackoverflow.com/a/25456134/7963
  *
- * @type {(x: unknown, y: unknown) => boolean }
- * @throws { Error } with some details the difference;
+ * @type {(x: unknown, y: unknown) => Delta }
+ * @typedef { null | { actual: unknown, expected?: unknown }} Delta
+ * @throws { NotEqualError } when non-primitive objects differ
+ *         with some details the difference;
  *         for example, what property is missing.
  */
-function deepEqual(x, y) {
+function deepDifference(x, y) {
   if (Object.is(x, y)) {
-    return true;
+    return null;
   }
   if (
     typeof x === 'object' &&
@@ -26,7 +28,7 @@ function deepEqual(x, y) {
     y != null
   ) {
     if (keys(x).length !== keys(y).length) {
-      const detail = JSON.stringify({
+      return {
         actual: {
           length: keys(x).length,
           keys: keys(x),
@@ -35,8 +37,7 @@ function deepEqual(x, y) {
           length: keys(y).length,
           keys: keys(y),
         },
-      });
-      throw new Error(`Object keys length: ${detail}`);
+      };
     }
 
     const { hasOwnProperty } = Object.prototype;
@@ -45,21 +46,20 @@ function deepEqual(x, y) {
       Reflect.apply(hasOwnProperty, obj, [prop]);
     for (const prop of Reflect.ownKeys(x)) {
       if (hasOwnPropertyOf(y, prop)) {
-        if (!deepEqual(x[prop], y[prop])) {
-          return false;
+        if (!deepDifference(x[prop], y[prop])) {
+          return null;
         }
       } else {
-        throw new Error(`missing property ${String(prop)}`);
+        return { actual: { extraProperty: prop } };
       }
     }
 
-    return true;
+    return null;
   }
-  const detail = JSON.stringify({
+  return {
     actual: { type: typeof x, value: x },
     expected: { type: typeof y, value: y },
-  });
-  throw new Error(detail);
+  };
 }
 
 /**
@@ -217,16 +217,6 @@ function makeTester(htest, out) {
     assert(!!value, msg);
   }
 
-  /** @type {(actual: unknown, expected: unknown) => void } */
-  function deepEqTest(actual, expected) {
-    try {
-      assert(deepEqual(actual, expected), 'should be deep equal');
-    } catch (reason) {
-      const summary = JSON.stringify({ actual, expected });
-      assert(false, `should be deep equal: ${summary} : ${reason.message}`);
-    }
-  }
-
   const t = freeze({
     plan(/** @type {number} */ count) {
       pending = count;
@@ -262,10 +252,15 @@ function makeTester(htest, out) {
     not(a, b, message = 'should not be identical') {
       assert(!Object.is(a, b), message);
     },
-    deepEqual: deepEqTest,
+    /** @type {(actual: unknown, expected: unknown, message?: string) => void } */
+    deepEqual(actual, expected, message = 'should be deep equal') {
+      const delta = deepDifference(actual, expected);
+      assert(delta === null, `${message}: ${JSON.stringify(delta)}`);
+    },
     /** @type {(a: unknown, b: unknown, message?: string) => void} */
     notDeepEqual(a, b, message = 'should not be deep equal') {
-      assert(!deepEqual(a, b), message);
+      const delta = deepDifference(a, b);
+      assert(delta !== null, `${message}: ${JSON.stringify(delta)}`);
     },
     /** @type {(a: unknown, b: unknown, message?: string) => void} */
     like(_a, _b, _message = 'should be like') {
