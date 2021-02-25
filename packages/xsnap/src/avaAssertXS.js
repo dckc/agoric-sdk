@@ -57,6 +57,8 @@ function deepEqual(x, y) {
 }
 
 /**
+ * Test status reporting inspired by Test Anything Protocol (TAP)
+ *
  * ref https://testanything.org/tap-specification.html
  *
  * @param {(msg: TapMessage) => void} send
@@ -179,6 +181,10 @@ function checkExpectation(exc, expectation) {
 }
 
 /**
+ * Emulate ava assertion API
+ *
+ * ref https://github.com/avajs/ava/blob/main/docs/03-assertions.md
+ *
  * @param {Harness} htest
  * @param {TapFormat} out
  *
