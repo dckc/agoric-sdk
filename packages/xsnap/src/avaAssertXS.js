@@ -78,19 +78,19 @@ function tapFormat(send) {
     plan(qty) {
       send({ plan: qty });
     },
-    /** @type {(n: number, t?: string) => void} */
+    /** @type {(testNum: number, txt?: string) => void} */
     ok(testNum, txt) {
       send({ status: 'ok', id: testNum, message: txt });
     },
-    /** @type {(n: number, t: string) => void} */
+    /** @type {(testNum: number, txt: string) => void} */
     skip(testNum, txt) {
       send({ status: 'SKIP', id: testNum, message: txt });
     },
-    /** @type {(n: number, t?: string) => void} */
+    /** @type {(testNum: number, txt?: string) => void} */
     notOk(testNum, txt) {
       send({ status: 'not ok', id: testNum, message: txt });
     },
-    /** @type {(t: string, label?: string) => void} */
+    /** @type {(txt: string, label?: string) => void} */
     diagnostic(txt, label) {
       send({ note: txt, label });
     },
@@ -131,7 +131,7 @@ function createHarness(send) {
     get context() {
       return context;
     },
-    /** @type {(l: string, f: () => Promise<void>) => void } */
+    /** @type {(label: string, hook: () => Promise<void>) => void } */
     before(_label, hook) {
       beforeHooks.push(hook);
     },
@@ -143,7 +143,7 @@ function createHarness(send) {
       }
       return testNum;
     },
-    /** @type { (f: () => Promise<void>) => Promise<void> } */
+    /** @type { (thunk: () => Promise<void>) => Promise<void> } */
     async defer(thunk) {
       suitesToRun.push(thunk);
     },
@@ -180,8 +180,8 @@ function checkExpectation(exc, expectation) {
   if ('message' in expectation) {
     const { message } = expectation;
     return typeof message === 'string'
-      ? exc.message === message
-      : exc.message.match(message);
+      ? message === exc.message
+      : message.test(exc.message);
   }
   throw Error(`not implemented: ${JSON.stringify(expectation)}`);
 }
@@ -200,7 +200,7 @@ function makeTester(htest, out) {
   /** @type {number?} */
   let pending;
 
-  /** @type {(r: boolean, info?: string) => void} */
+  /** @type {(result: boolean, info?: string) => void} */
   function assert(result, info) {
     if (typeof pending === 'number') {
       pending -= 1;
@@ -217,7 +217,7 @@ function makeTester(htest, out) {
     assert(!!value, msg);
   }
 
-  /** @type {(a: unknown, e: unknown) => void } */
+  /** @type {(actual: unknown, expected: unknown) => void } */
   function deepEqTest(actual, expected) {
     try {
       assert(deepEqual(actual, expected), 'should be deep equal');
@@ -254,24 +254,24 @@ function makeTester(htest, out) {
     false(/** @type {unknown} */ value, message = 'should be false') {
       assert(value === false, message);
     },
-    /** @type {(a: unknown, b: unknown, m?: string) => void} */
+    /** @type {(a: unknown, b: unknown, message?: string) => void} */
     is(a, b, message = 'should be identical') {
       assert(Object.is(a, b), message);
     },
-    /** @type {(a: unknown, b: unknown, m?: string) => void} */
+    /** @type {(a: unknown, b: unknown, message?: string) => void} */
     not(a, b, message = 'should not be identical') {
       assert(!Object.is(a, b), message);
     },
     deepEqual: deepEqTest,
-    /** @type {(a: unknown, b: unknown, m?: string) => void} */
+    /** @type {(a: unknown, b: unknown, message?: string) => void} */
     notDeepEqual(a, b, message = 'should not be deep equal') {
       assert(!deepEqual(a, b), message);
     },
-    /** @type {(a: unknown, b: unknown, m?: string) => void} */
+    /** @type {(a: unknown, b: unknown, message?: string) => void} */
     like(_a, _b, _message = 'should be like') {
       throw Error('not implemented');
     },
-    /** @type {(fn: () => unknown, e?: Expectation, m?: string) => void } */
+    /** @type {(fn: () => unknown, e?: Expectation, message?: string) => void } */
     throws(fn, expectation, message = `should throw like ${expectation}`) {
       try {
         fn();
@@ -280,7 +280,7 @@ function makeTester(htest, out) {
         assert(checkExpectation(ex, expectation), message);
       }
     },
-    /** @type {(fn: () => unknown, m?: string) => void } */
+    /** @type {(fn: () => unknown, message?: string) => void } */
     notThrows(fn, message) {
       try {
         fn();
@@ -288,7 +288,7 @@ function makeTester(htest, out) {
         assert(false, message);
       }
     },
-    /** @type {(thrower: () => Promise<unknown>, e?: Expectation, m?: string) => Promise<void> } */
+    /** @type {(thrower: () => Promise<unknown>, expectation?: Expectation, message?: string) => Promise<void> } */
     async throwsAsync(
       thrower,
       expectation,
@@ -301,7 +301,7 @@ function makeTester(htest, out) {
         assert(checkExpectation(ex, expectation), message);
       }
     },
-    /** @type {(thrower: () => Promise<unknown>, m?: string) => Promise<void> } */
+    /** @type {(thrower: () => Promise<unknown>, message?: string) => Promise<void> } */
     async notThrowsAsync(nonThrower, message) {
       try {
         await (typeof nonThrower === 'function' ? nonThrower() : nonThrower);
@@ -314,7 +314,7 @@ function makeTester(htest, out) {
   return t;
 }
 
-/** @type {(l: string, run: (t: Tester) => Promise<void>, opt: Harness?) => void } */
+/** @type {(label: string, run: (t: Tester) => Promise<void>, htestOpt: Harness?) => void } */
 function test(label, run, htestOpt) {
   const htest = htestOpt || theHarness;
   if (!htest) throw Error('no harness');
@@ -340,7 +340,7 @@ function test(label, run, htestOpt) {
 
 test.createHarness = createHarness;
 
-/** @type {(l: string, fn: () => Promise<void>) => void } */
+/** @type {(label: string, fn: () => Promise<void>) => void } */
 test.before = (label, fn) => {
   if (typeof label === 'function') {
     fn = label;
