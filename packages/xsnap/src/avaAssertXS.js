@@ -215,9 +215,9 @@ function makeTester(htest, out) {
   function deepEqTest(actual, expected) {
     try {
       assert(deepEqual(actual, expected), 'should be deep equal');
-    } catch (detail) {
+    } catch (reason) {
       const summary = JSON.stringify({ actual, expected });
-      assert(false, `should be deep equal: ${summary} : ${detail.message}`);
+      assert(false, `should be deep equal: ${summary} : ${reason.message}`);
     }
   }
 
