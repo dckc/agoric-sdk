@@ -5,9 +5,16 @@
 
 const { freeze, keys } = Object;
 
-// ack Paul Roub Aug 2014
-// https://stackoverflow.com/a/25456134/7963
-/** @type {(x: unknown, y: unknown) => boolean } */
+/**
+ * deep equal value comparison
+ *
+ * originally based on code from Paul Roub Aug 2014
+ * https://stackoverflow.com/a/25456134/7963
+ *
+ * @type {(x: unknown, y: unknown) => boolean }
+ * @throws { Error } with some details the difference;
+ *         for example, what property is missing.
+ */
 function deepEqual(x, y) {
   if (Object.is(x, y)) {
     return true;
@@ -42,7 +49,6 @@ function deepEqual(x, y) {
           return false;
         }
       } else {
-        // Separately, should this have the same detail structure as the other errors you're throwing?
         throw new Error(`missing property ${String(prop)}`);
       }
     }
