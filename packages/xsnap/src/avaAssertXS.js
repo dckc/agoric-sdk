@@ -171,7 +171,7 @@ function createHarness(send) {
 /**
  * @param {*} exc
  * @param {Expectation} expectation
- *
+ * @returns {boolean}
  * @typedef {{ instanceOf: Function } | { message: string | RegExp }=} Expectation
  */
 function checkExpectation(exc, expectation) {
