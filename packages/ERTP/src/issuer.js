@@ -13,16 +13,16 @@ import { makeAmountMath, MathKind } from './amountMath';
 import { makeFarName, ERTPKind } from './interfaces';
 import { coerceDisplayInfo } from './displayInfo';
 
-import './types';
+import * as _ from './types';
 
 /**
  * @type {MakeIssuerKit}
  */
-function makeIssuerKit(
+export const makeIssuerKit = harden((
   allegedName,
   amountMathKind = MathKind.NAT,
-  displayInfo = undefined,
-) {
+  displayInfo = undefined
+) => {
   assert.typeof(allegedName, 'string');
   displayInfo = coerceDisplayInfo(displayInfo);
 
@@ -45,11 +45,11 @@ function makeIssuerKit(
 
   const {
     makeInstance: makePayment,
-    makeWeakStore: makePaymentWeakStore,
+    makeWeakStore: makePaymentWeakStore
   } = makeExternalStore('payment', () =>
     Far(makeFarName(allegedName, ERTPKind.PAYMENT), {
       getAllegedBrand: () => brand,
-    }),
+    })
   );
 
   /** @type {WeakStore<Payment, Amount>} */
@@ -66,7 +66,7 @@ function makeIssuerKit(
     if (amount !== undefined) {
       assert(
         amountMath.isEqual(amount, paymentBalance),
-        X`payment balance ${paymentBalance} must equal amount ${amount}`,
+        X`payment balance ${paymentBalance} must equal amount ${amount}`
       );
     }
   };
@@ -80,7 +80,7 @@ function makeIssuerKit(
     purse =>
       Far(makeFarName(allegedName, ERTPKind.DEPOSIT_FACET), {
         receive: purse.deposit,
-      }),
+      })
   );
 
   const { makeInstance: makePurse } = makeExternalStore('purse', () => {
@@ -88,15 +88,15 @@ function makeIssuerKit(
     /** @type {NotifierRecord<Amount>} */
     const {
       notifier: balanceNotifier,
-      updater: balanceUpdater,
+      updater: balanceUpdater
     } = makeNotifierKit(currentBalance);
 
     /** @type {Purse} */
     const purse = Far(makeFarName(allegedName, ERTPKind.PURSE), {
       deposit: (srcPayment, optAmount = undefined) => {
         if (isPromise(srcPayment)) {
-          throw new TypeError(
-            `deposit does not accept promises as first argument. Instead of passing the promise (deposit(paymentPromise)), consider unwrapping the promise first: paymentPromise.then(actualPayment => deposit(actualPayment))`,
+          throw TypeError(
+            `deposit does not accept promises as first argument. Instead of passing the promise (deposit(paymentPromise)), consider unwrapping the promise first: paymentPromise.then(actualPayment => deposit(actualPayment))`
           );
         }
         assertKnownPayment(srcPayment);
@@ -105,7 +105,7 @@ function makeIssuerKit(
         assertAmountEqual(srcPaymentBalance, optAmount);
         const newPurseBalance = amountMath.add(
           srcPaymentBalance,
-          currentBalance,
+          currentBalance
         );
         // Commit point
         // Move the assets in `srcPayment` into this purse, using up the
@@ -161,10 +161,10 @@ function makeIssuerKit(
     // other uses.
 
     if (payments.length > 1) {
-      const paymentSet = new Set();
+      const paymentSet = newSet();
       payments.forEach(payment => {
         if (paymentSet.has(payment)) {
-          throw new Error('same payment seen twice');
+          throw Error('same payment seen twice');
         }
         paymentSet.add(payment);
       });
@@ -250,12 +250,12 @@ function makeIssuerKit(
         const srcPaymentBalance = paymentLedger.get(srcPayment);
         const paymentAmountB = amountMath.subtract(
           srcPaymentBalance,
-          paymentAmountA,
+          paymentAmountA
         );
         // Commit point
         const newPayments = reallocate(
           [srcPayment],
-          [paymentAmountA, paymentAmountB],
+          [paymentAmountA, paymentAmountB]
         );
         return newPayments;
       });
@@ -288,8 +288,4 @@ function makeIssuerKit(
     amountMath,
     brand,
   });
-}
-
-harden(makeIssuerKit);
-
-export { makeIssuerKit };
+});
